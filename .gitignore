@@ -1,0 +1,7 @@
+.ipynb_checkpoints
+.vscode
+*.bin
+*.cpython-*
+*.idraw
+lib
+roms

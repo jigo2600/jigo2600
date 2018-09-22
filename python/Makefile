@@ -1,0 +1,20 @@
+PYTHON=python3
+PYTHONCONFIG=$(PYTHON)-config
+PYBIND=$(shell $(PYTHON) -m pybind11 --includes)
+PYSUFFIX=$(shell $(PYTHONCONFIG) --extension-suffix)
+#OPT = -g -O0
+OPT = -O3
+src=$(wildcard ../src/*.cpp)
+hpp=$(wildcard ../src/*.hpp)
+
+jigo2600$(PYSUFFIX): jigo2600.cpp $(src) $(hpp) Makefile
+	c++ $(OPT) \
+	  -Wall -Wno-missing-braces \
+		-I../src -std=c++14 \
+		-shared -undefined dynamic_lookup -fPIC $(PYBIND) \
+		-o $(@) $(<) $(src)
+
+.PHONY: clean
+clean:
+	rm -rf jigo2600$(PYSUFFIX)
+	rm -rf jigo2600$(PYSUFFIX).dSYM
