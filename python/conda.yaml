@@ -1,0 +1,14 @@
+# conda env install -f conda.yml
+# libvorbis and libflac are required by sdl2_mixer in Windows
+name: jigo2600
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - pillow
+  - pysdl2
+  - sdl2
+  - sdl2_mixer
+  - libvorbis
+  - libflac
+  - pybind11

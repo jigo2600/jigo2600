@@ -1,5 +1,5 @@
 // TIASound.hpp
-// Atari 2600 TIA emulator.
+// Atari 2600 TIA sound emulator
 
 // Copyright (c) 2018 The Jigo2600 Team. All rights reserved.
 // This file is part of Jigo2600 and is made available under
@@ -11,7 +11,7 @@
 #include <cstdint>
 #include <array>
 
-namespace sim {
+namespace jigo {
 
   class TIASound {
   public:
@@ -27,7 +27,7 @@ namespace sim {
     static constexpr int bufferSize = (1 << 16) ;
     static constexpr int bufferMask = bufferSize - 1 ;
     inline std::uint8_t const* getBufferSamples() const ;
-    inline int const* getBufferSampleCycles() const ;
+    inline long long const* getBufferSampleCycles() const ;
     inline long long getBufferEnd() const ;
 
     // Audio buffer resampler.
@@ -42,7 +42,7 @@ namespace sim {
     int counter ;
     long long bufferEnd ;
     std::array<std::uint8_t, bufferSize> samples ;
-    std::array<int, bufferSize> sampleCycles ;
+    std::array<long long, bufferSize> sampleCycles ;
 
     // Resampler.
     static constexpr size_t smootherOrder = 2 ;
@@ -58,7 +58,7 @@ namespace sim {
     return &samples[0] ;
   }
 
-  int const* TIASound::getBufferSampleCycles() const {
+  long long const* TIASound::getBufferSampleCycles() const {
     return &sampleCycles[0] ;
   }
 

@@ -1,5 +1,5 @@
 // TIASound.hpp
-// Atari 2600 TIA emulator.
+// Atari 2600 TIA sound emulator
 
 // Copyright (c) 2018 The Jigo2600 Team. All rights reserved.
 // This file is part of Jigo2600 and is made available under
@@ -12,7 +12,7 @@
 #include <algorithm>
 #include <iostream>
 
-using namespace sim ;
+using namespace jigo ;
 using namespace std ;
 
 TIASound::TIASound()
@@ -160,7 +160,7 @@ TIASound::resample(uint8_t *begin, uint8_t *end, bool mix, double nominalRate) c
 
   // Smooth the latest simulated cycle to get a stable cycle rate.
   double smoothCycle = cycle ;
-  for (int k = 0 ; k < smoother.size() ; ++k) {
+  for (size_t k = 0 ; k < smoother.size() ; ++k) {
     auto w  = sos[k][3] * smoothCycle - sos[k][4] * smoother[k][0] - sos[k][5] * smoother[k][1] ;
     smoothCycle = sos[k][0] * w + sos[k][1] * smoother[k][0] + sos[k][2] * smoother[k][1] ;
     smoother[k] = {w, smoother[k][0]} ;
@@ -169,7 +169,7 @@ TIASound::resample(uint8_t *begin, uint8_t *end, bool mix, double nominalRate) c
   if (smoothCycle > cycle + 2*3.5e6/60 || smoothCycle < cycle - 2*3.5e6/60) {
     double y = cycle ;
     double r = nominalRate ;
-    for (int k = 0 ; k < smoother.size() ; ++k) {
+    for (size_t k = 0 ; k < smoother.size() ; ++k) {
       auto a = sos[k][3] / (1 + sos[k][4] + sos[k][5]) ;
       auto b = (sos[k][5] - 1) / (1 + sos[k][4] + sos[k][5]) ;
       auto p = sos[k][0] + sos[k][1] + sos[k][2] ;

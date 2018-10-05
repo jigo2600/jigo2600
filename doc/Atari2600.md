@@ -68,13 +68,13 @@ The port pins, interconnections, and purposes are summarised in the following ta
 
 | Switch            | Connection | Comment                                                      |
 | ----------------- | ---------- | ------------------------------------------------------------ |
-| Start/reset       | M6532 PB0  | Reset the game (reads 0)                                     |
-| Select            | M6532 PB1  | Select the next option (reads 0)                             |
+| Start/reset       | M6532 PB0  | Reset the game (reset occurs when the switch is closed, so that the port reads 0) |
+| Select            | M6532 PB1  | Select the next option (when the switch is closed and the port reads 0) |
 | Unused            | M6532 PB2  | Setting this port to an output allows to use it as storage (this is because written data is buffered by the M6532 and  can be read back). |
-| B/W vs color mode | M6532 PB3  | Color corresponds to an open switch (reads 1). Always 0 in the SECAM version of Atari 2600. |
+| B/W vs color mode | M6532 PB3  | Select color mode (when the switch is open and the port reads 1) or black and white mode. The port is hard-wirred to read 0 (black and white) in the SECAM version of Atari 2600. |
 | Unused            | M6532 PB4  | See above.                                                   |
 | Unused            | M6532 PB5  | See above.                                                   |
-| Difficulty left   | M6532 PB6  | Choose between difficulty A and B. Difficulty A corresponds to an open switch (reads 1). |
+| Difficulty left   | M6532 PB6  | Choose between difficulty A (open switch, port reads 1) and B. |
 | Difficulty right  | M6532 PB7  | Difficulty A corresponds to an open switch (reads 1).        |
 
 | Right port pin | Connection | Right joystick                                               | Right pair paddles      | Right keyboard                                               |

@@ -1,5 +1,5 @@
 // TIA.hpp
-// Atari2600 TIA emulator.
+// Atari2600 TIA emulator
 
 // Copyright (c) 2018 The Jigo2600 Team. All rights reserved.
 // This file is part of Jigo2600 and is made available under
@@ -10,7 +10,11 @@
 
 #define TIA_FAST 1
 #if TIA_FAST
+#if defined(_MSC_VER)
+#define TIA_FORCE_INLINE __forceinline
+#else
 #define TIA_FORCE_INLINE __attribute__((always_inline))
+#endif
 #else
 #define TIA_FORCE_INLINE
 #endif
@@ -19,7 +23,7 @@
 #include "TIASound.hpp"
 #include "json.hpp"
 
-namespace sim {
+namespace jigo {
 
   constexpr auto TIA_NTSC_COLOR_CLOCK_RATE = 3.579545e6  ;
   constexpr auto TIA_PAL_COLOR_CLOCK_RATE = 3.546894e6 ;
@@ -53,7 +57,7 @@ namespace sim {
       INPT3, INPT4, INPT5,
       NA1, // 0x3e
       NA2, // 0x3f
-      VOID // Placeholder to mean "none".
+      VOID // Placeholder that means "none".
     } ;
 
     // Lifecycle.
@@ -122,21 +126,28 @@ namespace sim {
     TIA& operator= (TIAState const& s) {TIAState::operator=(s);return *this;}
     TIA& operator= (TIA const&) = delete ;
 
-    // Operation.
+    // Operate.
     void cycle(bool CS, bool Rw, std::uint16_t address, std::uint8_t& data) ;
     void reset() ;
     uint32_t getColor(uint8_t value) const ;
     void setVerbose(bool x) {verbose = x;}
-
-    static int constexpr screenHeight = 228 + 8 + 10 ; //192 + 8 + 10 ;
+    bool getVerbose() const {return verbose;}
+  
+    // Access the screen.
+    static int constexpr topMargin = 37 - 1 ;
+    static int constexpr screenHeight = 192 + 10 ;
     static int constexpr screenWidth = 160 ;
     static float constexpr pixelAspectRatio = 1.8f ;
-
+    std::uint32_t const * getCurrentScreen() const ;
+    std::uint32_t const * getLastScreen() const ;
     VideoStandard getVideoStandard() const { return videoStandard ; }
     void setVideoStandard(VideoStandard x) { videoStandard = x ; }
+    std::array<int, 2> getScreenBounds() const ;
 
-    //private:
+    // Access the audio.
+    TIASound const & getSound(int channel) { return sound[channel] ; }
 
+  private:
     // Transient.
     TIASound sound[2] ;
     std::uint32_t colors [4] ;
@@ -145,7 +156,8 @@ namespace sim {
     int currentScreen ;
     std::uint32_t screen [numScreenBuffers] [screenWidth * screenHeight] ;
     int verbose ;
-    bool startNewFrame ;
+    int minY ;
+    int maxY ;
 
   protected:
     static struct Tables {
@@ -158,6 +170,6 @@ namespace sim {
   void from_json(nlohmann::json const& j, TIAState& state) ;
 }
 
-std::ostream& operator<< (std::ostream& os, sim::TIA::Register r) ;
+std::ostream& operator<< (std::ostream& os, jigo::TIA::Register r) ;
 
 #endif /* TIA_hpp */

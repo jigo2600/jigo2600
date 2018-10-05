@@ -1,5 +1,5 @@
 //  M6532.cpp
-//  M6532 emulator.
+//  M6532 emulator
 
 // Copyright (c) 2018 The Jigo2600 Team. All rights reserved.
 // This file is part of Jigo2600 and is made available under
@@ -9,11 +9,11 @@
 #include "string.h"
 
 using namespace std ;
-using namespace sim ;
+using namespace jigo ;
 using json = nlohmann::json ;
 
 #define cmp(x) (x==s.x)
-bool M6532State::operator==(const sim::M6532State &s) const {
+bool M6532State::operator==(const jigo::M6532State &s) const {
   return
   cmp(portA) && cmp(portB) &&
   cmp(ORA) && cmp(ORB) &&
@@ -132,7 +132,7 @@ bool M6532::cycle(bool CS, bool RSnot, bool RW, uint16_t address, uint8_t& data)
   return false ;
 }
 
-void sim::to_json(nlohmann::json& j, M6532State const& state)
+void jigo::to_json(nlohmann::json& j, M6532State const& state)
 {
 #undef jput
 #define jput(x) j[# x] = state.x
@@ -154,7 +154,7 @@ void sim::to_json(nlohmann::json& j, M6532State const& state)
 }
 
 /// Throws `nlohmann::json::exception` on parsing errors.
-void sim::from_json(nlohmann::json const& j, M6532State& state)
+void jigo::from_json(nlohmann::json const& j, M6532State& state)
 {
 #undef jget
 #define jget(m) state.m = j[# m].get<decltype(state.m)>()

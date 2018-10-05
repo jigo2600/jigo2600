@@ -1,23 +1,22 @@
 // Atari2600.cpp
-// Atari2600 Emulator
+// Atari2600 emulator
 
 // Copyright (c) 2018 The Jigo2600 Team. All rights reserved.
 // This file is part of Jigo2600 and is made available under
 // the terms of the BSD license (see the COPYING file).
 
 #include "Atari2600.hpp"
-#include "json.hpp"
 
-#include <fstream>
-#include <iostream>
-#include <iomanip>
 #include <algorithm>
-#include <functional>
-#include <memory>
 #include <cassert>
+#include <fstream>
+#include <functional>
+#include <iomanip>
+#include <iostream>
+#include <memory>
 
 using namespace std ;
-using namespace sim ;
+using namespace jigo ;
 using json = nlohmann::json ;
 
 std::ostream & operator<< (std::ostream& os, Atari2600::DecodedAddress const& da)
@@ -46,7 +45,7 @@ std::ostream & operator<< (std::ostream& os, Atari2600::DecodedAddress const& da
 // MARK: - Serlialize & deserialize state
 // -------------------------------------------------------------------
 
-void sim::to_json(json& j, const Atari2600State& state)
+void jigo::to_json(json& j, const Atari2600State& state)
 {
   j["version"] = "1.0" ;
   j["cpu"] = *state.cpu ;
@@ -60,7 +59,7 @@ void sim::to_json(json& j, const Atari2600State& state)
 }
 
 /// Throws `nlohmann::json::exception` on parsing errors.
-void sim::from_json(const json& j, Atari2600State& state)
+void jigo::from_json(const json& j, Atari2600State& state)
 {
   *state.cpu = j["cpu"] ;
   *state.pia = j["pia"] ;
@@ -88,7 +87,7 @@ Atari2600::DecodedAddress::DecodedAddress(uint32_t address, bool Rw)
   }
   else {
     this->device = DecodedAddress::TIA ;
-    this->tiaRegister = sim::TIA::decodeAddress(Rw,address) ;
+    this->tiaRegister = jigo::TIA::decodeAddress(Rw,address) ;
   }
 }
 
@@ -96,21 +95,25 @@ Atari2600::DecodedAddress::DecodedAddress(uint32_t address, bool Rw)
 // MARK: - Atari2600State
 // -------------------------------------------------------------------
 
+/// Create a new state using the specified component states.
 Atari2600State::Atari2600State
 (std::shared_ptr<M6502State> cpu,
  std::shared_ptr<M6532State> pia,
- std::shared_ptr<sim::TIAState> tia,
+ std::shared_ptr<jigo::TIAState> tia,
  std::shared_ptr<Atari2600CartridgeState> cartridge)
 : cpu(cpu), pia(pia), tia(tia), cartridge(cartridge)
 { }
 
+/// Create a new state instance. The new cartridge state is null.
 Atari2600State::Atari2600State()
 {
   cpu = make_shared<M6502State>() ;
   pia = make_shared<M6532State>() ;
-  tia = make_shared<sim::TIAState>() ;
+  tia = make_shared<jigo::TIAState>() ;
+  cartridge = nullptr ;
 }
 
+// Helper.
 template<class T, class U>
 bool cmp(const std::shared_ptr<T>&a,const std::shared_ptr<U>&b)
 {
@@ -119,6 +122,7 @@ bool cmp(const std::shared_ptr<T>&a,const std::shared_ptr<U>&b)
   return false;
 }
 
+/// Compare two states for value equality.
 bool Atari2600State::operator== (Atari2600State const &s) const {
   return
   cmp(cpu, s.cpu) &&
@@ -131,8 +135,9 @@ bool Atari2600State::operator== (Atari2600State const &s) const {
 // MARK: - Simulation
 // -------------------------------------------------------------------
 
-/// Simulate up to the minimum of `maxNumCPUClocks`, the next frame is
-/// reached, or a breakpoint is reached.
+/// Run the simulation until `maxNumCPUClocks` have been executed, a new frame is
+/// generated, or a breakpoint is reached, depending which events occur first.
+/// Note that more than one of these criteria can be met at the same time; the function returns all reasons why it stopped.
 
 Atari2600::StoppingReason
 Atari2600::cycle(size_t &maxNumCPUCycles)
@@ -142,84 +147,88 @@ Atari2600::cycle(size_t &maxNumCPUCycles)
 
   // Simulate cycles.
   StoppingReason reason ;
-  auto xcpu = getCpu() ;
-  auto xpia = getPia() ;
-  auto xtia = getTia() ;
-  auto xcart = getCartridge() ;
+  auto _cpu = getCpu() ;
+  auto _pia = getPia() ;
+  auto _tia = getTia() ;
+  auto _cart = getCartridge() ;
 
-  reason.set(StoppingReason::numClocksReached, maxNumCPUCycles == 0) ;
+  // If no cycles should be simulated, make sure we stop immediately.
+  reason.set(StoppingReason::numCyclesReached, maxNumCPUCycles == 0) ;
 
+  // Loop until one of the stopping reasons is met.
   while (!reason.any())
   {
-    // Step CPU and decode address on bus.
-    xcpu->cycle(xtia->RDY) ; maxNumCPUCycles-- ;
-    auto da = DecodedAddress(xcpu->getAddressBus(), xcpu->getRW()) ;
+    // Step the CPU and decode the address it places on the bus.
+    _cpu->cycle(_tia->RDY) ; maxNumCPUCycles-- ;
+    auto da = DecodedAddress(_cpu->getAddressBus(), _cpu->getRW()) ;
 
-    // Step all other devices.
+    // Step the PIA.
     bool oututPortsChanged =
-    xpia->cycle(da.device == DecodedAddress::PIA,
-                xcpu->getAddressBus() & 0x200,
-                xcpu->getRW(),
-                xcpu->getAddressBus(),
-                xcpu->getDataBus()) ;
+    _pia->cycle(da.device == DecodedAddress::PIA,
+                _cpu->getAddressBus() & 0x200,
+                _cpu->getRW(),
+                _cpu->getAddressBus(),
+                _cpu->getDataBus()) ;
 
     if (oututPortsChanged) {
       syncPorts() ;
     }
 
-    xtia->cycle(da.device == DecodedAddress::TIA,
-                xcpu->getRW(),
-                xcpu->getAddressBus(),
-                xcpu->getDataBus()) ;
+    // Step the TIA. Remember the current frame in order to detect
+    // the beginning of a new one.
+    auto lastFrame = _tia->numFrames ;
+    _tia->cycle(da.device == DecodedAddress::TIA,
+                _cpu->getRW(),
+                _cpu->getAddressBus(),
+                _cpu->getDataBus()) ;
 
-    // The cartridge is updated last as rare
-    // carts (FE banking) sniff data on the bus to work,
-    // and the latter must be up to date.
+    // Step the cartridge. The cartridge must be updated last
+    // as some rare cart types (FE banking) "sniff"
+    // the data bus to work, and the latter must be up to date.
     if (cartridge) {
-      xcart->cycle(*this,da.device==DecodedAddress::Cartridge) ;
+      _cart->cycle(*this,da.device==DecodedAddress::Cartridge) ;
     }
 
-    if (xtia->verbose&0) {
-      if (da.Rw) {
-        cout << "(R) " << da << " -> " ;
-      } else {
-        cout << "(W) " << da << " <- " ;
-      }
-      cout << hex << setfill('0') << setw(2) << (int)xcpu->getDataBus() << endl ;
+    if (_tia->getVerbose() & false) {
+      cout 
+      << (da.Rw ? "R" : "W") 
+      << setfill('0') << setw(4) << hex << (int)_cpu->getAddressBus() 
+      << " (" << setfill(' ') << setw(8) << da << ") = "
+      << setfill('0') << setw(2) << hex << (int)_cpu->getDataBus() << " "
+      << M6502::decode(_cpu->getIR()) << " T" << _cpu->getT()
+      << std::endl ;
     }
 
-    // Check if we should break due to the maximum number of clocks
-    // having been simulated.
-    reason.set(StoppingReason::numClocksReached, maxNumCPUCycles==0) ;
+    // Check if the maximum number of CPU clocks have been simulated.
+    reason.set(StoppingReason::numCyclesReached, maxNumCPUCycles==0) ;
 
-    // Check if we should break due to a new frame start.
-    if (xtia->startNewFrame) {
-      xtia->startNewFrame = false ;
-      xtia->numFrames ++ ;
+    // Check if a new frame has started.
+    if (_tia->numFrames > lastFrame) {
       reason.set(StoppingReason::frameDone) ;
     }
 
-    // Handle breakpoints.
-    if ((xcpu->getT() == 1) && xtia->RDY && breakOnNextInstruction) {
+    // Check if a breakpoint was hit.
+    if ((_cpu->getT() == 1) && _tia->RDY && breakOnNextInstruction) {
       // T=1 means that the CPU is executing the first cycle of a
-      // new instruction. Now registers are updated with the *input*
-      // to this instructions, including cpu.PCForCurrentInstruction().
+      // new instruction. At this point, the CPU registers
+      // are already updated with the *input* to that instruction,
+      // including cpu.PCForCurrentInstruction().
       reason.set(StoppingReason::breakpoint) ;
       breakOnNextInstruction = false ;
     }
 
-    if (xcpu->getT() == 0) {
-      // T=0 when the CPU has put on the address bus the
-      // address of the next instruction opcode to read. Note, however,
+    if (_cpu->getT() == 0) {
+      // T=0 means that the CPU has put on the address bus the
+      // address of the next instruction opcode. Note, however,
       // that the *previous* instruction is still finishing during this
       // cycle, so cpu.PCForCurrentInstruction() is still the old one
-      // and registers are still not updated.
+      // and registers are still not updated with the new data.
       //
-      // We check the breakpoint list to know if we should break
-      // after one more cycle.
+      // The breakpoint list is scanned to check for a hit after the *next* cycle
+      // is executed.
       uint32_t virtualAddress = da.address ;
-      if (da.device == DecodedAddress::Cartridge && cartridge) {
-        virtualAddress = xcart->decodeAddress(virtualAddress) ;
+      if (da.device == DecodedAddress::Cartridge && _cart) {
+        virtualAddress = _cart->decodeAddress(virtualAddress) ;
       }
       if (breakPoints.find(virtualAddress) != breakPoints.end()) {
         // Clear the breakpoint if temporary.
@@ -241,7 +250,7 @@ void Atari2600::setCartridge(shared_ptr<Atari2600Cartridge> cartridge) {
 }
 
 /// Create an unitialized state object.
-shared_ptr<sim::Atari2600State>
+shared_ptr<jigo::Atari2600State>
 Atari2600::makeState() const
 {
   auto s = make_shared<Atari2600State>() ;
@@ -261,7 +270,7 @@ Atari2600::saveState() const
   return s ;
 }
 
-/// Reset the system state from the specified copy.
+/// Reset the system's state by copying the specified state.
 Atari2600Error
 Atari2600::loadState(const Atari2600State & s)
 {
@@ -279,6 +288,14 @@ Atari2600::loadState(const Atari2600State & s)
   setVideoStandard(getTia()->videoStandard) ;
   return Atari2600Error::success ;
 }
+
+/// Set the emulator verbosity level. The following levels are supported:
+///
+/// - 0: supporesses all messages.
+/// - 1: shows basic simulator events, such as resetting the machine.
+/// - 2: also show sthe CPU instructions as they are executed.
+/// - 3: also shows the individual CPU cycles.
+/// - 4: also shows the TIA, PIA, and cartidge cycles.
 
 void Atari2600::setVerbosity(int verbosity)
 {
@@ -302,6 +319,8 @@ float Atari2600::getColorClockRate() const
 }
 
 /// Get the nmber of clock cycles simulated so far.
+/// Note that this is not the number of CPU clock cycles, as the CPU
+/// runs at a third of the color clock rate.
 long long Atari2600::getColorCycleNumber() const
 {
   return tia->numCycles ;
@@ -330,32 +349,18 @@ Atari2600::getVideoStandard() const
   return getTia()->getVideoStandard() ;
 }
 
-/// Set the state of one of the console switches.
+/// Set the state of the console panel switches.
 void
-Atari2600::setSwitch(Switch id, bool state)
+Atari2600::setPanel(Panel panel)
 {
-  switch (id) {
-    case Switch::reset: switchReset = state; break;
-    case Switch::select: switchSelect = state; break;
-    case Switch::colorMode: switchColorMode = state; break;
-    case Switch::difficultyLeft: switchDifficultyLeft = state; break;
-    case Switch::difficultyRight: switchDifficultyRight = state; break;
-    default: assert(false) ;
-  }
+  this->panel = panel ;
 }
 
-/// Get the state of one of the console switches.
-bool
-Atari2600::getSwitch(Switch id) const
+/// Get the state of the console panel switches.
+Atari2600::Panel
+Atari2600::getPanel() const
 {
-  switch (id) {
-    case Switch::reset: return switchReset;
-    case Switch::select: return switchSelect;
-    case Switch::colorMode: return switchColorMode;
-    case Switch::difficultyLeft: return switchDifficultyLeft;
-    case Switch::difficultyRight: return switchDifficultyRight;
-    default: assert(false) ;
-  }
+  return panel ;
 }
 
 void
@@ -385,23 +390,6 @@ Atari2600::setKeyboard(int num, Atari2600::Keyboard keys)
   assert(0 <= num && num < 2) ;
   keyboards[num] = keys ;
   inputType = InputType::keyboard ;
-}
-
-
-/// Get the screen being drawn.
-uint32_t * Atari2600::getCurrentScreen() const
-{
-  auto& tia = *getTia() ;
-  int b = (tia.currentScreen + tia.numScreenBuffers) % tia.numScreenBuffers ;
-  return tia.screen[b] ;
-}
-
-/// Get the last drawn screen.
-uint32_t * Atari2600::getLastScreen() const
-{
-  auto& tia = *getTia() ;
-  int b = (tia.currentScreen - 1 + tia.numScreenBuffers) % tia.numScreenBuffers ;
-  return tia.screen[b] ;
 }
 
 void Atari2600::syncPorts()
@@ -474,11 +462,11 @@ void Atari2600::syncPorts()
       assert(false) ;
       break;
   }
-  pia.setPortB((1 << 0) * !switchReset +
-               (1 << 1) * !switchSelect +
-               (1 << 3) * switchColorMode +
-               (1 << 6) * switchDifficultyLeft +
-               (1 << 7) * switchDifficultyRight) ;
+  pia.setPortB((1 << 0) * !panel[Panel::reset] +
+               (1 << 1) * !panel[Panel::select] +
+               (1 << 3) * !panel[Panel::colorMode] +
+               (1 << 6) * !panel[Panel::difficultyLeft] +
+               (1 << 7) * !panel[Panel::difficultyRight]) ;
 }
 
 // -------------------------------------------------------------------
@@ -488,15 +476,12 @@ void Atari2600::syncPorts()
 Atari2600::Atari2600()
 : Atari2600State(make_shared<M6502>(),
                  make_shared<M6532>(),
-                 make_shared<sim::TIA>(),
+                 make_shared<jigo::TIA>(),
                  nullptr)
 {
   setVideoStandard(VideoStandard::NTSC) ;
-  switchReset = false ;
-  switchSelect = false ;
-  switchColorMode = true ;
-  switchDifficultyLeft = false ;
-  switchDifficultyRight = false ;
+  panel.Panel::super::reset() ;
+  panel.set(Panel::colorMode) ;
   reset() ;
 }
 
@@ -505,7 +490,7 @@ Atari2600::~Atari2600()
 
 void Atari2600::reset()
 {
-  if (getTia()->verbose) {
+  if (getTia()->getVerbose() ) {
     cout << "--------------------------------------------------------" << endl ;
     cout << "Atari2600 Reset" << endl ;
     cout << "--------------------------------------------------------" << endl ;

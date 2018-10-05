@@ -1,4 +1,5 @@
 // M6502Disassembler.hpp
+// M6502 disassembler
 
 // Copyright (c) 2018 The Jigo2600 Team. All rights reserved.
 // This file is part of Jigo2600 and is made available under
@@ -8,9 +9,9 @@
 #define M6502Disassembler_hpp
 
 #include "M6502.hpp"
-#include <iostream>
+#include <vector>
 
-namespace sim {
+namespace jigo {
 
   enum M6502ByteType {
     End = 0,

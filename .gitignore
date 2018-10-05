@@ -1,7 +1,14 @@
 .ipynb_checkpoints
 .vscode
+*.xcodeproj
 *.bin
 *.cpython-*
+*.exp
 *.idraw
+*.lib
+*.obj
+*.pyd
 lib
 roms
+run.bat
+

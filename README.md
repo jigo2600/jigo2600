@@ -12,20 +12,21 @@ The Python driver is the easiest way to test the emulator.
 
 1. Download a game ROM. There are several free roms at [Atari Age](http://www.atariage.com/software_list.html?SystemID=2600&searchRarity=11). For example:
 
-        curl -L http://atariage.com/2600/roms/GoFish_SP.zip  | bsdtar -xf-
+        curl -L http://atariage.com/2600/roms/GoFish_SP.zip -o tmp.zip && unzip -o tmp.zip && rm tmp.zip
 
 2. Install Python3, SDL2, and pybind11. The easiest way is to install [Anaconda](https://www.anaconda.com/download/) or [Miniconda](https://conda.io/miniconda.html) and then issuing the command:
 
-        conda env create -f python/env-conda.yaml
+        conda env create -f python/conda.yaml
         conda activate jigo2600
 
 3. Compile the emulator:
 
-        make -C python
+        make -C python -f Makefile.macos # for macOS
+        make -C python -f Makefile.linux # for Linux
 
 4. Run the emulator:
 
-        python3 python/jigo2600emu.py GoFish_NTSC.bin
+        python3 python/jigo2600emulator.py GoFish_NTSC.bin
 
 Versions
 --------

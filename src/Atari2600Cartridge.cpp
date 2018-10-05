@@ -1,5 +1,5 @@
 // Atari2600Cartridge.cpp
-// Atari2600
+// Atari2600 cartridges
 
 // Copyright (c) 2018 The Jigo2600 Team. All rights reserved.
 // This file is part of Jigo2600 and is made available under
@@ -16,7 +16,7 @@
 
 using json = nlohmann::json ;
 using namespace std ;
-using namespace sim ;
+using namespace jigo ;
 
 constexpr size_t operator"" _KiB(unsigned long long n) { return 1024 * n ; }
 
@@ -100,11 +100,19 @@ public:
   }
 
   unique_ptr<Atari2600CartridgeState> save() const override {
+#if __cplusplus <= 201103L
+    return move(unique_ptr<State>(new State(self()))) ;
+#else
     return make_unique<State>(self()) ;
+#endif
   }
 
   unique_ptr<Atari2600CartridgeState> makeAlike() const override {
+#if __cplusplus <= 201103L
+    return move(unique_ptr<State>(new State())) ;
+#else
     return make_unique<State>() ;
+#endif
   }
 
 private:
@@ -207,7 +215,7 @@ template <Type ty, int rom, int ram> struct traits_helper : public strobe<rom> {
   static constexpr Type type = ty ;
   static constexpr int romSize = rom ;
   static constexpr int ramSize = ram ;
-  static constexpr int numBanks = std::max((size_t)1, romSize / 4_KiB) ;
+  static constexpr int numBanks = (romSize / 4_KiB >  1) ? (romSize / 4_KiB) : 1 ;
 } ;
 
 template <Type type> struct traits ;
@@ -612,7 +620,6 @@ private:
   using super = StateHelper<Atari2600CartridgeFEState,Type::FE,0> ;
 } ;
 
-
 class Atari2600CartridgeFE :
 public CartridgeHelper<Atari2600CartridgeFE,Atari2600CartridgeFEState,Atari2600CartridgeE0State::romSize>
 {
@@ -660,16 +667,20 @@ bool is_member(const vector<T>& v, const T& x)
 }
 
 template<class C> unique_ptr<C> mk(const char* begin, const char* end) {
+#if __cplusplus <= 201103L
+  auto x = unique_ptr<C>(new C()) ;
+#else
   auto x = make_unique<C>() ;
+#endif
   x->loadFromBytes(begin, end) ;
-  return x ;
+  return move(x) ;
 }
 
 shared_ptr<Atari2600Cartridge>
-sim::makeCartridgeFromBytes(const char* begin, const char* end,
+jigo::makeCartridgeFromBytes(const char* begin, const char* end,
                             Atari2600Cartridge::Type type)
 {
-  using namespace sim ;
+  using namespace jigo ;
   ptrdiff_t size = end - begin ;
 
   // Try to identify standard cartridges.
@@ -739,14 +750,14 @@ sim::makeCartridgeFromBytes(const char* begin, const char* end,
       m(FE) ;
     default: assert(false) ;
   }
-  return cart ;
+  return move(cart) ;
 }
 
 shared_ptr<Atari2600Cartridge>
-sim::makeCartridgeFromBytes(const std::vector<char>& data,
+jigo::makeCartridgeFromBytes(const std::vector<char>& data,
                             Atari2600Cartridge::Type type)
 {
-  return sim::makeCartridgeFromBytes(&*begin(data), &*end(data), type) ;
+  return jigo::makeCartridgeFromBytes(&*begin(data), &*end(data), type) ;
 }
 
 

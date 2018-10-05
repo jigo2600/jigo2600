@@ -1,4 +1,5 @@
 // M6502Disassembler.cpp
+// M6502 disassembler
 
 // Copyright (c) 2018 The Jigo2600 Team. All rights reserved.
 // This file is part of Jigo2600 and is made available under
@@ -12,7 +13,7 @@
 #include <functional>
 
 using namespace std ;
-using namespace sim ;
+using namespace jigo ;
 
 constexpr auto inf = numeric_limits<float>::infinity() ;
 
@@ -46,7 +47,7 @@ struct TaggerState
  */
 
 vector<M6502ByteType>
-sim::tagM6502Memory(std::uint8_t const * begin, std::uint8_t const * end)
+jigo::tagM6502Memory(std::uint8_t const * begin, std::uint8_t const * end)
 {
   auto const length = end - begin ;
   auto current = begin ;
@@ -175,9 +176,9 @@ sim::tagM6502Memory(std::uint8_t const * begin, std::uint8_t const * end)
 }
 
 M6502Disassembly
-sim::disassembleM6502memory(std::uint8_t const * begin, std::uint8_t const * end)
+jigo::disassembleM6502memory(std::uint8_t const * begin, std::uint8_t const * end)
 {
-  auto tags = sim::tagM6502Memory(begin,end) ;
+  auto tags = jigo::tagM6502Memory(begin,end) ;
   auto lines = M6502Disassembly() ;
   for (auto curr = begin ; curr < end ; ) {
     array<uint8_t,3> threeBytes {

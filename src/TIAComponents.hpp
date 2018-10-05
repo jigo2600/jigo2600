@@ -1,5 +1,5 @@
 // TIAComponents.hpp
-// Atari2600 TIA emulator.
+// Atari2600 TIA components emulation
 
 // Copyright (c) 2018 The Jigo2600 Team. All rights reserved.
 // This file is part of Jigo2600 and is made available under
@@ -12,6 +12,8 @@
 #include <array>
 #include <iostream>
 #include <algorithm>
+#include <bitset>
+#include <climits>
 #include "json.hpp"
 
 #undef jput
@@ -21,7 +23,7 @@
 #define jget(m) x.m = j[# m]
 #define cmp(x) (x == rhs.x)
 
-namespace sim {
+namespace jigo {
 
   // Reflect bits in an integer.
   template <typename T>
@@ -100,18 +102,24 @@ namespace sim {
     }
 
     template<class U> friend void
-    to_json(nlohmann::json& j, TIADelay<U> const& x) {
-      j = x.value ; 
-    }
+    to_json(nlohmann::json& j, TIADelay<U> const& x) ;
 
     template<class U> friend void
-    from_json(nlohmann::json const& j, TIADelay<U>& x) {
-      x.value = j ;
-    }
+    from_json(nlohmann::json const& j, TIADelay<U>& x);
 
   protected:
     std::array<T,2> value ;
   } ;
+
+  template<class U> void
+  to_json(nlohmann::json& j, TIADelay<U> const& x) {
+    j = x.value ;
+  }
+
+  template<class U> void
+  from_json(nlohmann::json const& j, TIADelay<U>& x) {
+    x.value = j ;
+  }
 
   class TIADelayedLatch : public TIADelay<bool>
   {
@@ -157,22 +165,28 @@ namespace sim {
     }
 
     template <int n> friend void
-    to_json(nlohmann::json& j, TIADualPhaseAndCounter<n> const& x) {
-      j = nlohmann::json::array({x.phase,x.RESL,x.C,x.RES}) ;
-    }
+    to_json(nlohmann::json& j, TIADualPhaseAndCounter<n> const& x) ;
 
     template <int n> friend void
-    from_json(nlohmann::json const& j, TIADualPhaseAndCounter<n>& x) {
-      x.phase = j[0].get<int>() ;
-      x.RESL  = j[1].get<bool>() ;
-      x.C     = j[2].get<int>() ;
-      x.RES   = j[3].get<bool>() ;
-    }
+    from_json(nlohmann::json const& j, TIADualPhaseAndCounter<n>& x) ;
 
   protected:
     int C ;
     bool RES ;
   } ;
+
+  template <int n> void
+  to_json(nlohmann::json& j, TIADualPhaseAndCounter<n> const& x) {
+    j = nlohmann::json::array({x.phase,x.RESL,x.C,x.RES}) ;
+  }
+
+  template <int n> void
+  from_json(nlohmann::json const& j, TIADualPhaseAndCounter<n>& x) {
+    x.phase = j[0].get<int>() ;
+    x.RESL  = j[1].get<bool>() ;
+    x.C     = j[2].get<int>() ;
+    x.RES   = j[3].get<bool>() ;
+  }
 
   template <int maxCount>
   class TIACounter

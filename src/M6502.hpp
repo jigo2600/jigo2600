@@ -1,5 +1,5 @@
 // M6502.hpp
-// M6502 simulator
+// M6502 emulator
 
 // Copyright (c) 2018 The Jigo2600 Team. All rights reserved.
 // This file is part of Jigo2600 and is made available under
@@ -10,10 +10,11 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <bitset>
 #include <iostream>
 #include "json.hpp"
 
-namespace sim {
+namespace jigo {
 
   /// The state of the M6502 CPU.
   struct M6502State
@@ -426,9 +427,9 @@ namespace sim {
   }
 }
 
-std::ostream& operator<<(std::ostream & os, sim::M6502::InstructionTraits const &ins) ;
-std::ostream& operator<<(std::ostream & os, sim::M6502::Instruction const &ins) ;
-std::ostream& operator<<(std::ostream & os, sim::asBytesWrapper<sim::M6502::InstructionTraits const> ins) ;
-std::ostream& operator<<(std::ostream & os, sim::asBytesWrapper<sim::M6502::Instruction const> ins) ;
+std::ostream& operator<<(std::ostream & os, jigo::M6502::InstructionTraits const &ins) ;
+std::ostream& operator<<(std::ostream & os, jigo::M6502::Instruction const &ins) ;
+std::ostream& operator<<(std::ostream & os, jigo::asBytesWrapper<jigo::M6502::InstructionTraits const> ins) ;
+std::ostream& operator<<(std::ostream & os, jigo::asBytesWrapper<jigo::M6502::Instruction const> ins) ;
 
 #endif /* M6502_hpp */

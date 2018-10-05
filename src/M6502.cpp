@@ -1,5 +1,5 @@
 // M6502.cpp
-// M6502 simulator
+// M6502 emulator
 
 // Copyright (c) 2018 The Jigo2600 Team. All rights reserved.
 // This file is part of Jigo2600 and is made available under
@@ -17,7 +17,7 @@
 #define XAA_LIKE_VISUAL6502 1
 
 using namespace std ;
-using namespace sim ;
+using namespace jigo ;
 using json = nlohmann::json;
 
 // -------------------------------------------------------------------
@@ -97,7 +97,7 @@ std::ostream& operator<<(std::ostream & os, asBytesWrapper<M6502::Instruction co
 // MARK: - Serialize & deserialize state
 // -------------------------------------------------------------------
 
-void sim::to_json(json& j, const M6502State& s)
+void jigo::to_json(json& j, const M6502State& s)
 {
 #undef jput
 #define jput(x) j[# x] = s.x
@@ -123,7 +123,7 @@ void sim::to_json(json& j, const M6502State& s)
 }
 
 /// Throws `nlohmann::json::exception` on parsing errors.
-void sim::from_json(const json& j, M6502State& state)
+void jigo::from_json(const json& j, M6502State& state)
 {
 #undef jget
 #define jget(x) state.x = j.at(# x)
@@ -526,6 +526,10 @@ void M6502::reset()
   dc = decode(IR) ;
   numCycles = 0 ;
   resetLine = true ; // This will cause the CPU to load the reset vector.
+  nmiLine = false ; // Assume by default that both interrupt lines are low on reset.
+  irqLine = false ;
+    
+  // TODO: decide what to do about the rest of the state (which is likely random in the actual CPU).
 }
 
 M6502& M6502::operator= (M6502State const& s)
@@ -754,7 +758,7 @@ void M6502::cycle(bool busWasReady)
     else if (dc.instructionType == INY) { Y = ADD ; }
     else if (dc.instructionType == AXS) { X = ADD ; }
 
-    // Load a new instruction in IR. This is either theinstruction in
+    // Load a new instruction in IR. This is either the instruction in
     // the data bus or the BRK opcode if an interrupt occurs.
     if (resetLine || nmiLine || (irqLine & !P[P.i])) {
       IR = 0x00 ; // BRK

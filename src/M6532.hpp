@@ -1,5 +1,5 @@
 //  M6532.hpp
-//  M6532 emulator.
+//  M6532 emulator
 
 // Copyright (c) 2018 The Jigo2600 Team. All rights reserved.
 // This file is part of Jigo2600 and is made available under
@@ -13,8 +13,8 @@
 #include <iostream>
 #include "json.hpp"
 
-namespace sim {
-
+namespace jigo
+{
   /// The state of the M6532 coprocessor.
   struct M6532State
   {
@@ -22,6 +22,7 @@ namespace sim {
     virtual ~M6532State() = default ;
     bool operator== (M6532State const&) const ;
 
+    /// The M6532 has only seven address bit `A[0:6]`.
     // The seven address bits are not enough to identify registers uniquely. For that,
     // we pre-pend the bits [RSnot,RW], obtaining register codes
     // of the type [RSnot,Rw].0xxx.xxx. Note that the 8-th bit is always
@@ -129,9 +130,8 @@ namespace sim {
     // Transient.
     bool verbose ;
   } ;
+} // namespace jigo
 
-}
-
-std::ostream & operator<< (std::ostream& os, sim::M6532State::Register r) ;
+std::ostream & operator<< (std::ostream& os, jigo::M6532State::Register r) ;
 
 #endif /* M6532_hpp */

@@ -1,5 +1,5 @@
 // TIA.cpp
-// Atari 2600 TIA emulator.
+// Atari2600 TIA emulator
 
 // Copyright (c) 2018 The Jigo2600 Team. All rights reserved.
 // This file is part of Jigo2600 and is made available under
@@ -11,7 +11,7 @@
 #include <cstring>
 
 using namespace std ;
-using namespace sim ;
+using namespace jigo ;
 using json = nlohmann::json ;
 
 // -------------------------------------------------------------------
@@ -184,7 +184,7 @@ std::ostream & operator<< (std::ostream& os, TIAState::Register r)
 }
 
 #define cmp(x) (x == s.x)
-bool TIAState::operator==(const sim::TIAState &s) const {
+bool TIAState::operator==(const jigo::TIAState &s) const {
   return
   cmp(numCycles) && cmp(numFrames) && cmp(strobe) && cmp(D) &&
   cmp(RDY) && cmp(beamX) && cmp(beamY) && cmp(Hphasec) &&
@@ -250,8 +250,22 @@ void TIA::reset() {
   for (int k = 0 ; k < 2 ; ++k) {sound[k].reset();}
 }
 
+/// Get the screen being drawn.
+uint32_t const * TIA::getCurrentScreen() const
+{
+  int b = (currentScreen + numScreenBuffers) % numScreenBuffers ;
+  return screen[b] ;
+}
+
+/// Get the last drawn screen.
+uint32_t const * TIA::getLastScreen() const
+{
+  int b = (currentScreen - 1 + numScreenBuffers) % numScreenBuffers ;
+  return screen[b] ;
+}
+
 // -------------------------------------------------------------------
-// MARK: - TIA Simulate cycle
+// MARK: - Emulation core
 // -------------------------------------------------------------------
 
 void TIA::cycle(bool CS, bool Rw, uint16_t address, uint8_t& data)
@@ -378,21 +392,26 @@ void TIA::cycle(bool CS, bool Rw, uint16_t address, uint8_t& data)
     visibility[TIAObject::P0] = P[0].get() ;
     visibility[TIAObject::P1] = P[1].get() ;
 
-    // Todo: Color updates at the last pixel should be reflected? Why?
+    // Todo: Color updates applied at the last pixel should be effective? Why?
     if (!VB)
     {
+      // The Stella programming manual suggests to turn on VSYNC for 3 scanlines
+      // and after thant blank for 37 more. Howevder, several games blank for less,
+      // so we make a consevative choice here and cut out only 30 lines after VSYNC
+      // ends.
       int x = beamX - 68 ;
-      int y = beamY - (40 - 3) ;
+      int y = beamY - topMargin ;
       bool right = (x >= 80) ;
 
-      // Collisions and color. Collisions are deteced during HBLANK,
-      // but not during VBLANK.
+      // Collisions and color.
+      // Collisions are deteced during HBLANK, but not during VBLANK.
       int collisionAndColor = tables.collisionAndColorTable
       [64*3 * PF.getPFP() +
        64 * (PF.getSCORE() * (1 + right)) +
        visibility.to_ulong()] ;
       collisions |= collisionAndColor ;
 
+      // The beam emits a color ony if HBLANK is off.
       if (HBnot.get()) {
         if (0 <= x && x < screenWidth &&
             0 <= y && y < screenHeight) {
@@ -402,7 +421,7 @@ void TIA::cycle(bool CS, bool Rw, uint16_t address, uint8_t& data)
     }
 
     // -----------------------------------------------------------------
-    // CKLP raising edge and CLK second half period
+    // CKLP raising edge and CLK second half period.
     // -----------------------------------------------------------------
     // The visual objects are also sensitive to the raising edge of CLKP,
     // but the update is implemented in-place. The pixel latches that
@@ -412,7 +431,7 @@ void TIA::cycle(bool CS, bool Rw, uint16_t address, uint8_t& data)
     auto const MOTCK = HBnot.get() ;
 
     // TODO: not so sure if M should be updated before or after P
-    // due to the RESMP depenency
+    // due to the RESMP depenency.
     B.cycle(MOTCK & !BEC.get(Hphasec), strobe == RESBL) ;
     M[0].cycle(MOTCK & !MEC[0].get(Hphasec), strobe == RESM0, P[0]) ;
     M[1].cycle(MOTCK & !MEC[1].get(Hphasec), strobe == RESM1, P[1]) ;
@@ -518,7 +537,7 @@ void TIA::cycle(bool CS, bool Rw, uint16_t address, uint8_t& data)
             if (VS == true) {
               // VSYNC switches off
               beamY = 0 ;
-              startNewFrame = true ;
+              ++numFrames ;
               currentScreen = (currentScreen + 1) % numScreenBuffers ;
               int memorySize = screenWidth*screenHeight*sizeof(uint32_t) ;
               memset(screen[currentScreen], 0, memorySize) ;
@@ -574,7 +593,7 @@ void TIA::cycle(bool CS, bool Rw, uint16_t address, uint8_t& data)
 // MARK: - Serialize & deserialize state
 // -------------------------------------------------------------------
 
-namespace sim {
+namespace jigo {
   static void to_json(nlohmann::json& j, const TIAState::VideoStandard& p)
   {
     switch (p) {
@@ -616,7 +635,6 @@ namespace sim {
     jput(Hphasec) ;
     jput(SEC) ;
     jput(SECL) ;
-    //jput(HMOVEL) ;
     jput(VB) ;
     jput(VS) ;
     jput(HMC) ;
@@ -646,7 +664,6 @@ namespace sim {
     jget(Hphasec) ;
     jget(SEC) ;
     jget(SECL) ;
-    //jget(HMOVEL) ;
     jget(VB) ;
     jget(VS) ;
     jget(HMC) ;
