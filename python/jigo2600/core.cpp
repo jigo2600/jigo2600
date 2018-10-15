@@ -76,7 +76,7 @@ vector<Atari2600StoppingReason> to_vector(Atari2600::StoppingReason const& r) {
 // MARK: - Definitions
 // ------------------------------------------------------------------
 
-PYBIND11_MODULE(jigo2600, m) {
+PYBIND11_MODULE(core, m) {
   m.doc() = "Atari2600 simulator" ;
 
   static py::exception<CartridgeTypeMismatchException> exc(m, "CartridgeTypeMismatchException");
@@ -188,6 +188,7 @@ PYBIND11_MODULE(jigo2600, m) {
     .def("get_panel", &Atari2600::getPanel)
     .def("set_panel", &Atari2600::setPanel)
     .def("set_joystick", &Atari2600::setJoystick)
+    .def("set_paddle", &Atari2600::setPaddle)
     ;
 
   py::enum_<Atari2600StoppingReason>(atari2600, "StoppingReason")
@@ -290,4 +291,14 @@ PYBIND11_MODULE(jigo2600, m) {
   .value("RIGHT", Atari2600JoystickSwitch::right)
   ;
   
+  // ----------------------------------------------------------------
+  // MARK: Paddle
+  // ----------------------------------------------------------------
+
+   py::class_<Atari2600::Paddle>(atari2600, "Paddle")
+  .def(py::init<>())
+  .def_readwrite("fire", &Atari2600::Paddle::fire)
+  .def_readwrite("angle", &Atari2600::Paddle::angle)
+  ;
+
 } 

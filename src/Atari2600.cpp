@@ -284,6 +284,7 @@ Atari2600::loadState(const Atari2600State & s)
   *getCpu() = *s.cpu ;
   *getPia() = *s.pia ;
   *getTia() = *s.tia ;
+  // TODO: stoppingReason?
   // To update dependents.
   setVideoStandard(getTia()->videoStandard) ;
   return Atari2600Error::success ;
