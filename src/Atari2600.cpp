@@ -87,7 +87,7 @@ Atari2600::DecodedAddress::DecodedAddress(uint32_t address, bool Rw)
   }
   else {
     this->device = DecodedAddress::TIA ;
-    this->tiaRegister = jigo::TIA::decodeAddress(Rw,address) ;
+    this->tiaRegister = TIA::decodeAddress(Rw, address) ;
   }
 }
 
@@ -99,7 +99,7 @@ Atari2600::DecodedAddress::DecodedAddress(uint32_t address, bool Rw)
 Atari2600State::Atari2600State
 (std::shared_ptr<M6502State> cpu,
  std::shared_ptr<M6532State> pia,
- std::shared_ptr<jigo::TIAState> tia,
+ std::shared_ptr<TIAState> tia,
  std::shared_ptr<Atari2600CartridgeState> cartridge)
 : cpu(cpu), pia(pia), tia(tia), cartridge(cartridge)
 { }
@@ -109,7 +109,7 @@ Atari2600State::Atari2600State()
 {
   cpu = make_shared<M6502State>() ;
   pia = make_shared<M6532State>() ;
-  tia = make_shared<jigo::TIAState>() ;
+  tia = make_shared<TIAState>() ;
   cartridge = nullptr ;
 }
 
@@ -159,7 +159,8 @@ Atari2600::cycle(size_t &maxNumCPUCycles)
   while (!reason.any())
   {
     // Step the CPU and decode the address it places on the bus.
-    _cpu->cycle(_tia->RDY) ; maxNumCPUCycles-- ;
+    _cpu->cycle(_tia->RDY) ;
+    maxNumCPUCycles-- ;
     auto da = DecodedAddress(_cpu->getAddressBus(), _cpu->getRW()) ;
 
     // Step the PIA.
@@ -250,7 +251,7 @@ void Atari2600::setCartridge(shared_ptr<Atari2600Cartridge> cartridge) {
 }
 
 /// Create an unitialized state object.
-shared_ptr<jigo::Atari2600State>
+shared_ptr<Atari2600State>
 Atari2600::makeState() const
 {
   auto s = make_shared<Atari2600State>() ;
@@ -406,7 +407,7 @@ void Atari2600::syncPorts()
         (1 << 0) * !joysticks[num][Joystick::up] ;
       } ;
       tia.ports.setI45({!joysticks[0][Joystick::fire],!joysticks[1][Joystick::fire]}) ;
-      pia.setPortA((setj(0) << 4) | setj(1)) ;
+      pia.writePortA((setj(0) << 4) | setj(1)) ;
       break ;
     }
     case InputType::paddle: {
@@ -417,10 +418,10 @@ void Atari2600::syncPorts()
         rates[num] = 270.0f / (380.0f * (paddles[num].angle + 135.1f)) ;
       }
       tia.ports.setI03(rates) ;
-      pia.setPortA((1 << 7) * !paddles[0].fire +
-                    (1 << 6) * !paddles[1].fire +
-                    (1 << 3) * !paddles[2].fire +
-                    (1 << 2) * !paddles[3].fire) ;
+      pia.writePortA((1 << 7) * !paddles[0].fire +
+                     (1 << 6) * !paddles[1].fire +
+                     (1 << 3) * !paddles[2].fire +
+                     (1 << 2) * !paddles[3].fire) ;
       break ;
     }
     case InputType::keyboard: {
@@ -428,11 +429,10 @@ void Atari2600::syncPorts()
       auto I45 = tia.ports.getI45() ;
       // num = 0: left
       for (int num = 0 ; num < 2 ; ++num) {
-        std::uint8_t row = pia.getPortA() >> (4 - num * 4) ;
+        std::uint8_t row = pia.portA >> (4 - num * 4) ;
         I03[1+num*2] = 1.f ;
         I03[num*2] = +1.f ;
-        I45[num] = true
-        ;
+        I45[num] = true ;
         if (~row & 0x1) { // row pulls down
           if (keyboards[num][0]) I03[num*2] = -1.f ;
           if (keyboards[num][1]) I03[1+num*2] = -1.f ;
@@ -463,7 +463,7 @@ void Atari2600::syncPorts()
       assert(false) ;
       break;
   }
-  pia.setPortB((1 << 0) * !panel[Panel::reset] +
+  pia.writePortB((1 << 0) * !panel[Panel::reset] +
                (1 << 1) * !panel[Panel::select] +
                (1 << 3) * !panel[Panel::colorMode] +
                (1 << 6) * !panel[Panel::difficultyLeft] +
@@ -491,10 +491,8 @@ Atari2600::~Atari2600()
 
 void Atari2600::reset()
 {
-  if (getTia()->getVerbose() ) {
-    cout << "--------------------------------------------------------" << endl ;
-    cout << "Atari2600 Reset" << endl ;
-    cout << "--------------------------------------------------------" << endl ;
+  if (getTia()->getVerbose()) {
+    cout << "Atari2600:: Reset" << endl ;
   }
   // Input.
   for (auto& j : joysticks) { j = Joystick() ; }
@@ -561,13 +559,13 @@ Atari2600::getBreakPoints()
   return breakPoints ;
 }
 
-void Atari2600::setBreakPoint(uint32_t address, bool temporary)
+void Atari2600::setBreakPoint(uint32_t virtualAddress, bool temporary)
 {
-  if (breakPoints.find(address) == breakPoints.end()) {
-    breakPoints[address] = Atari2600BreakPoint() ;
+  if (breakPoints.find(virtualAddress) == breakPoints.end()) {
+    breakPoints[virtualAddress] = Atari2600BreakPoint() ;
   }
-  auto& bp = breakPoints[address] ;
-  bp.address = address ;
+  auto& bp = breakPoints[virtualAddress] ;
+  bp.virtualAddress = virtualAddress ;
   if (!temporary) {
     bp.persistent = true ;
   } else {
@@ -575,9 +573,9 @@ void Atari2600::setBreakPoint(uint32_t address, bool temporary)
   }
 }
 
-void Atari2600::clearBreakPoint(uint32_t address, bool temporary)
+void Atari2600::clearBreakPoint(uint32_t virtualAddress, bool temporary)
 {
-  auto bpi = breakPoints.find(address) ;
+  auto bpi = breakPoints.find(virtualAddress) ;
   if (bpi != breakPoints.end()) {
     auto& bp = bpi->second ;
     if (!temporary) {

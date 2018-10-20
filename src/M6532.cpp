@@ -36,21 +36,7 @@ static map<M6532State::Register,char const *> registerNames
 
 void M6532::reset()
 {
-  fill(begin(ram),end(ram),0) ;
-  portA = 0 ;
-  portB = 0 ;
-  ORA = 0 ;
-  ORB = 0 ;
-  DDRA = 0 ;
-  DDRB = 0 ;
-  timerInterval = 1024 ;
-  timerCounter = 0 ;
-  INTIM = 0 ;
-  positiveEdgeDetect = false ;
-  timerInterrupt = false ;
-  timerInterruptEnabled = false ;
-  pa7Interrupt = false ;
-  pa7InterruptEnabled = false ;
+  *this=M6532State{} ;
 }
 
 bool M6532::cycle(bool CS, bool RSnot, bool RW, uint16_t address, uint8_t& data)
@@ -181,7 +167,7 @@ std::ostream & operator<< (std::ostream& os, M6532State::Register r)
   if (n != registerNames.end()) {
     os << n->second ;
   } else {
-    os << hex << setfill('0') << setw(2) << (int)r << " (PIA?)" ;
+    os << "INVALID(" << hex << setfill('0') << setw(2) << (int)r << ")" ;
   }
   return os ;
 }

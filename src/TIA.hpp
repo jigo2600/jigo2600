@@ -25,19 +25,23 @@
 
 namespace jigo {
 
-  constexpr auto TIA_NTSC_COLOR_CLOCK_RATE = 3.579545e6  ;
-  constexpr auto TIA_PAL_COLOR_CLOCK_RATE = 3.546894e6 ;
-   
-  // -----------------------------------------------------------------
-  // MARK: - TIA state
-  // -----------------------------------------------------------------
+constexpr auto TIA_NTSC_COLOR_CLOCK_RATE = 3.579545e6;
+constexpr auto TIA_PAL_COLOR_CLOCK_RATE = 3.546894e6;
 
-  struct TIAState
-  {
-    enum class VideoStandard : int {NTSC, PAL, SECAM} videoStandard = VideoStandard::NTSC ;
+// -----------------------------------------------------------------
+// MARK: - TIA state
+// -----------------------------------------------------------------
 
-    enum Register {
-      // Writable registers.
+struct TIAState {
+  enum class VideoStandard : int {
+    NTSC,
+    PAL,
+    SECAM
+  } videoStandard = VideoStandard::NTSC;
+
+  enum Register {
+    // Writable registers.
+    // clang-format off
       VSYNC = 0, VBLANK, WSYNC, RSYNC,
       NUSIZ0, NUSIZ1,
       COLUP0, COLUP1, COLUPF, COLUBK, CTRLPF,
@@ -58,118 +62,116 @@ namespace jigo {
       NA1, // 0x3e
       NA2, // 0x3f
       VOID // Placeholder that means "none".
-    } ;
+    // clang-format on
+  };
 
-    // Lifecycle.
-    virtual ~TIAState() = default ;
-    bool operator== (TIAState const& s) const ;
+  // Lifecycle.
+  virtual ~TIAState() = default;
+  bool operator==(TIAState const& s) const;
 
-    inline static Register decodeAddress(bool Rw, std::uint16_t address) {
-      if (Rw) {
-        // Note that registers e and f do not exist. Due to the circuitry,
-        // in this case the TIA should read a zero in the last two bits.
-        return static_cast<Register>((address & 0xf) | 0x30) ;
-      } else {
-        return static_cast<Register>(address & 0x3f) ;
-      }
+  inline static Register decodeAddress(bool Rw, std::uint16_t address) {
+    if (Rw) {
+      // Note that registers e and f do not exist. Due to the circuitry,
+      // in this case the TIA should read a zero in the last two bits.
+      return static_cast<Register>((address & 0xf) | 0x30);
+    } else {
+      return static_cast<Register>(address & 0x3f);
     }
+  }
 
-    // Counters.
-    std::int64_t numCycles ;
-    std::int64_t numFrames ;
+  // Counters.
+  std::int64_t numCycles{};
+  std::int64_t numFrames{};
 
-    // Data bus.
-    Register strobe ;
-    std::uint8_t D ;
-    bool RDY ;
+  // Data bus.
+  Register strobe{Register::VOID};
+  std::uint8_t D{};
+  bool RDY{true};
 
-    // Display.
-    int beamX ;
-    int beamY ;
-    TIADualPhaseAndCounter<56> Hphasec ;
-    TIADelayedLatch HBnot ;
-    TIASEC SEC ;
-    bool SECL ;
-    bool VB ; // VBLANK latch.
-    bool VS ; // VSYNC latch.
+  // Display.
+  int beamX{};
+  int beamY{};
+  TIADualPhaseAndCounter<56> Hphasec{1, false, 56, true};
+  TIADelayedLatch HBnot;
+  TIASEC SEC;
+  bool SECL{};
+  bool VB{}; // VBLANK latch.
+  bool VS{}; // VSYNC latch.
 
-    // Extra motion clocks.
-    int HMC ;
-    TIAExtraClock BEC ;
-    std::array<TIAExtraClock,2> MEC ;
-    std::array<TIAExtraClock,2> PEC ;
+  // Extra motion clocks.
+  int HMC{};
+  TIAExtraClock BEC;
+  std::array<TIAExtraClock, 2> MEC{};
+  std::array<TIAExtraClock, 2> PEC{};
 
-    // Visual objects.
-    TIAPlayField PF ;
-#if TIA_FAST
-    TIABall B ;
-    std::array<TIAMissile,2> M ;
-    std::array<TIAPlayer,2> P ;
-#else
-    TIABallAlt B ;
-    std::array<TIAMissileAlt,2> M ;
-    std::array<TIAPlayerAlt,2> P ;
-#endif
-    int collisions ;
+  // Visual objects.
+  TIAPlayField PF;
+  TIABall B;
+  std::array<TIAMissile, 2> M{};
+  std::array<TIAPlayer, 2> P{};
+  int collisions{};
 
-    // IO ports.
-    TIAPorts ports ;
-  } ;
+  // IO ports.
+  TIAPorts ports;
+};
 
-  // -----------------------------------------------------------------
-  // MARK: - TIA
-  // -----------------------------------------------------------------
+// -----------------------------------------------------------------
+// MARK: - TIA
+// -----------------------------------------------------------------
 
-  class TIA : public TIAState {
-  public:
-    // Lifecycle.
-    TIA& operator= (TIAState const& s) {TIAState::operator=(s);return *this;}
-    TIA& operator= (TIA const&) = delete ;
+class TIA : public TIAState {
+public:
+  // Lifecycle.
+  TIA& operator=(TIAState const& s) {
+    TIAState::operator=(s);
+    return *this;
+  }
+  TIA& operator=(TIA const&) = delete;
 
-    // Operate.
-    void cycle(bool CS, bool Rw, std::uint16_t address, std::uint8_t& data) ;
-    void reset() ;
-    uint32_t getColor(uint8_t value) const ;
-    void setVerbose(bool x) {verbose = x;}
-    bool getVerbose() const {return verbose;}
-  
-    // Access the screen.
-    static int constexpr topMargin = 37 - 1 ;
-    static int constexpr screenHeight = 192 + 10 ;
-    static int constexpr screenWidth = 160 ;
-    static float constexpr pixelAspectRatio = 1.8f ;
-    std::uint32_t const * getCurrentScreen() const ;
-    std::uint32_t const * getLastScreen() const ;
-    VideoStandard getVideoStandard() const { return videoStandard ; }
-    void setVideoStandard(VideoStandard x) { videoStandard = x ; }
-    std::array<int, 2> getScreenBounds() const ;
+  // Operate.
+  void cycle(bool CS, bool Rw, std::uint16_t address, std::uint8_t& data);
+  void reset();
+  uint32_t getColor(uint8_t value) const;
+  void setVerbose(bool x) { verbose = x; }
+  bool getVerbose() const { return verbose; }
 
-    // Access the audio.
-    TIASound const & getSound(int channel) { return sound[channel] ; }
+  // Access the screen.
+  static int constexpr topMargin = 37 - 12;
+  static int constexpr screenHeight = 192 + 11;
+  static int constexpr screenWidth = 160;
+  static float constexpr pixelAspectRatio = 1.8f;
+  std::uint32_t const* getCurrentScreen() const;
+  std::uint32_t const* getLastScreen() const;
+  VideoStandard getVideoStandard() const { return videoStandard; }
+  void setVideoStandard(VideoStandard x) { videoStandard = x; }
+  std::array<int, 2> getScreenBounds() const;
 
-  private:
-    // Transient.
-    TIASound sound[2] ;
-    std::uint32_t colors [4] ;
-    unsigned int collisions ;
-    static int constexpr numScreenBuffers = 3 ;
-    int currentScreen ;
-    std::uint32_t screen [numScreenBuffers] [screenWidth * screenHeight] ;
-    int verbose ;
-    int minY ;
-    int maxY ;
+  // Access the audio.
+  TIASound const& getSound(int channel) { return sound[channel]; }
 
-  protected:
-    static struct Tables {
-      Tables() ;
-      unsigned int collisionAndColorTable [2 * 3 * 64] ;
-    } tables ;
-  } ;
+private:
+  // Transient.
+  TIASound sound[2];
+  std::uint32_t colors[4];
+  unsigned int collisions;
+  static int constexpr numScreenBuffers = 3;
+  int currentScreen;
+  std::uint32_t screen[numScreenBuffers][screenWidth * screenHeight];
+  int verbose;
 
-  void to_json(nlohmann::json& j, TIAState const& state) ;
-  void from_json(nlohmann::json const& j, TIAState& state) ;
-}
+protected:
+  static struct Tables {
+    Tables();
+    unsigned int collisionAndColorTable[2 * 3 * 64];
+  } tables;
+};
 
-std::ostream& operator<< (std::ostream& os, jigo::TIA::Register r) ;
+void to_json(nlohmann::json& j, const TIAState::VideoStandard& p);
+void from_json(const nlohmann::json& j, TIAState::VideoStandard& p);
+void to_json(nlohmann::json& j, TIAState const& state);
+void from_json(nlohmann::json const& j, TIAState& state);
+} // namespace jigo
+
+std::ostream& operator<<(std::ostream& os, jigo::TIA::Register r);
 
 #endif /* TIA_hpp */

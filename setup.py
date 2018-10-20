@@ -20,9 +20,10 @@ class get_pybind_include(object):
         import pybind11
         return pybind11.get_include(self.user)
 
- 
+
 class BuildExt(build_ext):
-    """A custom build extension for adding compiler-specific options."""
+    "A custom build extension for adding compiler-specific options."
+
     def build_extensions(self):
         # Get the default compiler options for extensions.
         c_opts = []
@@ -43,7 +44,6 @@ class BuildExt(build_ext):
         elif ct == 'msvc':
             c_opts += [f'/DVERSION_INFO="{self.distribution.get_version()}"']
             c_opts += ['/EHsc']
-
 
         # Set the options for each target.
         for ext in self.extensions:
@@ -81,7 +81,7 @@ setup(
                 'src/',
                 get_pybind_include(),
                 get_pybind_include(user=True)
-            ],            
+            ],
             language='c++'
         ),
     ],

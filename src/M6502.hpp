@@ -22,7 +22,53 @@ namespace jigo {
     // Lifecycle.
     virtual ~M6502State() = default ;
     bool operator==(M6502State const&) const ;
+    
+    // Manpiulate.
+    bool getRW() const ;
+    std::uint16_t getAddressBus() const ;
+    void setAddressBus(std::uint16_t x) ;
+    std::uint8_t getDataBus() const ;
+    std::uint8_t& getDataBus() ;
+    void setDataBus(std::uint8_t data) ;
+    bool getIRQLine() const ;
+    void setIRQLine(bool x) ;
+    bool getNMILine() const ;
+    void setNMILine(bool x) ;
+    bool getResetLine() const ;
+    void setResetLine(bool x) ;
+    
+    std::uint8_t getA() const ;
+    std::uint8_t getX() const ;
+    std::uint8_t getY() const ;
+    std::uint8_t getS() const ;
+    std::uint8_t getP(bool b = false) const ;
+    std::uint16_t getPC() const ;
+    std::uint16_t getPCP() const ;
+    std::uint16_t getPCIR() const ;
+    std::uint8_t getIR() const ;
+    std::uint16_t getAD() const ;
+    std::uint8_t getADD() const ;
+    int getT() const ;
+    int getTP() const ;
 
+    void setA(std::uint8_t A) ;
+    void setX(std::uint8_t X) ;
+    void setY(std::uint8_t Y) ;
+    void setS(std::uint8_t S) ;
+    void setP(std::uint8_t P) ;
+    void setPC(std::uint16_t PC) ;
+    void setPCP(std::uint16_t PCP) ;
+    void setPCIR(std::uint16_t PCIR) ;
+    void setIR(std::uint8_t IR) ;
+    void setAD(std::uint16_t AD) ;
+    void setADD(std::uint8_t ADD) ;
+    void setT(int T) ;
+    void setTP(int TP) ;
+    
+    size_t getNumCycles() const ;
+    void setNumCycles(size_t n) ;
+
+  protected:
     // Data lines.
     bool RW ; /// Read-write flag.
     std::uint16_t addressBus ;
@@ -44,7 +90,7 @@ namespace jigo {
     std::uint16_t PC ; /// Program counter.
 
     // Internal CPU state.
-    std::uint16_t PCCurrent ; /// PC of the instruction in IR.
+    std::uint16_t PCIR ; /// PC of the instruction in the IR.
     std::uint16_t PCP ; /// Next value of PC.
     std::uint8_t IR ; /// Instruction register.
     std::uint16_t AD ; /// Address register.
@@ -54,6 +100,9 @@ namespace jigo {
 
     // Counters.
     size_t numCycles ; /// Number of cycles simulated so far.
+    
+    friend void to_json(nlohmann::json& j, const M6502State& s) ;
+    friend void from_json(const nlohmann::json& j, M6502State& state) ;
   } ;
 
   class M6502 : public M6502State
@@ -148,49 +197,14 @@ namespace jigo {
     M6502& operator= (M6502 const&) = delete ;
     virtual ~M6502() = default ;
 
-    // Run the simulation.
+    // Operation.
     void reset() ;
     void cycle(bool busWasReady) ;
-    size_t getNumCycles() const ;
     bool getVerbose() const ;
     void setVerbose(bool x) ;
 
-    // Manpiulate the data lines.
-    bool getRW() const ;
-    std::uint16_t getAddressBus() const ;
-    std::uint8_t getDataBus() const ;
-    std::uint8_t& getDataBus() { return dataBus ; }
-    void setDataBus(std::uint8_t data) ;
-    bool getIRQLine() const ;
-    void setIRQLine(bool x) ;
-    bool getNMILine() const ;
-    void setNMILine(bool x) ;
-    bool getResetLine() const ;
-    void setResetLine(bool x) ;
-
-    // Read the registers.
-    std::uint8_t getX() const ;
-    std::uint8_t getY() const ;
-    std::uint8_t getA() const ;
-    std::uint8_t getS() const ;
-    std::uint8_t getP(bool b = false) const ;
-    std::uint16_t getPC() const ;
-    std::uint16_t getPCForCurrentInstruction() const ;
-    std::uint8_t getIR() const ;
-    int getT() const ;
-
-    // Write the registers: use at your own peril.
-    void setA(std::uint8_t A) ;
-    void setX(std::uint8_t X) ;
-    void setY(std::uint8_t Y) ;
-    void setS(std::uint8_t S) ;
-    void setP(std::uint8_t P) ;
-    void setPC(std::uint16_t addr) ;
-    void setIR(std::uint8_t IR) ;
-    void setT(int T) ;
-
   private:
-    // Transient CPU state.
+    // Transient state.
     InstructionTraits dc ; // Can be deduced from IR.
     bool verbose ;
 
@@ -235,172 +249,211 @@ namespace jigo {
   inline
   M6502State::PRegister::operator std::uint8_t() const
   {
-    return to_ulong() ;
+    return static_cast<std::uint8_t>(to_ulong()) ;
   }
 
-  /** Get the RW line.
-
-   The function returns @c true if the CPU is performing a @em read
-   operation.
-   */
-
-  inline bool M6502::getRW() const
+  inline bool M6502State::getRW() const
   {
     return RW ;
   }
 
-  /** Get the current value on the address bus.
-
-   The CPU places a new address duing each cycle.
-   */
-
-  inline std::uint16_t M6502::getAddressBus() const
+  inline std::uint16_t M6502State::getAddressBus() const
   {
     return addressBus;
   }
+  
+  inline void M6502State::setAddressBus(std::uint16_t x)
+  {
+    addressBus = x ;
+  }
 
-  /** Get the current value placed by the CPU on the data bus.
-
-   This operation is only valid when the CPU is performing a write
-   operation, which can be determined by using `getRW()`.
-   */
-
-  inline std::uint8_t M6502::getDataBus() const
+  inline std::uint8_t M6502State::getDataBus() const
   {
     return dataBus;
   }
 
-  /** Writes data to the data bus.
+  inline std::uint8_t& M6502State::getDataBus() {
+    return dataBus ;
+  }
 
-   This operation is only valid during a read cycle.
-
-   \sa getRW().
-   */
-
-  inline void M6502::setDataBus(std::uint8_t data)
+  inline void M6502State::setDataBus(std::uint8_t data)
   {
     dataBus = data;
   }
 
-
-  inline std::uint8_t M6502::getIR() const
+  inline std::uint8_t M6502State::getIR() const
   {
     return IR ;
   }
 
-  inline std::uint8_t M6502::getS() const
+  inline std::uint8_t M6502State::getS() const
   {
     return S ;
   }
 
-  inline std::uint16_t M6502::getPC() const
+  inline std::uint16_t M6502State::getPC() const
   {
     return PC ;
   }
 
-  inline std::uint16_t M6502::getPCForCurrentInstruction() const
+  inline std::uint16_t M6502State::getPCP() const
   {
-    return PCCurrent ;
+    return PCP ;
+  }
+  
+  inline std::uint16_t M6502State::getPCIR() const
+  {
+    return PCIR ;
   }
 
-  inline std::uint8_t M6502::getA() const
+  inline std::uint8_t M6502State::getA() const
   {
     return A ;
   }
 
-  inline std::uint8_t M6502::getX() const
+  inline std::uint8_t M6502State::getX() const
   {
     return X ;
   }
 
-  inline std::uint8_t M6502::getY() const
+  inline std::uint8_t M6502State::getY() const
   {
     return Y ;
   }
 
-  inline std::uint8_t M6502::getP(bool b) const
+  inline std::uint8_t M6502State::getP(bool b) const
   {
     return static_cast<uint8_t>(P) | (b << 4) | (1 << 5) ;
   }
 
-  inline int M6502::getT() const
+  inline int M6502State::getT() const
   {
     return T ;
   }
+  
+  inline std::uint16_t M6502State::getAD() const
+  {
+    return TP ;
+  }
+  
+  inline std::uint8_t M6502State::getADD() const
+  {
+    return T ;
+  }
+  
+  inline int M6502State::getTP() const
+  {
+    return TP ;
+  }
 
-  inline bool M6502::getNMILine() const
+  inline bool M6502State::getNMILine() const
   {
     return nmiLine ;
   }
 
-  inline bool M6502::getIRQLine() const
+  inline bool M6502State::getIRQLine() const
   {
     return irqLine ;
   }
 
-  inline bool M6502::getResetLine() const
+  inline bool M6502State::getResetLine() const
   {
     return resetLine ;
   }
 
-  inline size_t M6502::getNumCycles() const
+  inline void M6502State::setA(std::uint8_t A)
+  {
+    this->A = A ;
+  }
+
+  inline void M6502State::setX(std::uint8_t X)
+  {
+    this->X = X ;
+  }
+
+  inline void M6502State::setY(std::uint8_t Y)
+  {
+    this->Y = Y ;
+  }
+  
+  inline void M6502State::setS(std::uint8_t S)
+  {
+    this->S = S ;
+  }
+
+  inline void M6502State::setPC(std::uint16_t PC)
+  {
+    PCP = this->PC = PC ; // todo: review
+  }
+  
+  inline void M6502State::setPCP(std::uint16_t PCP)
+  {
+    this->PCP = PCP ;
+  }
+  
+  inline void M6502State::setPCIR(std::uint16_t PCIR)
+  {
+    this->PCIR = PCIR ;
+  }
+
+  inline void M6502State::setIR(std::uint8_t IR)
+  {
+    this->IR = IR ;
+  }
+  
+  inline void M6502State::setAD(std::uint16_t AD)
+  {
+    this->AD = AD ;
+  }
+
+  inline void M6502State::setADD(std::uint8_t ADD)
+  {
+    this->ADD = ADD ;
+  }
+
+  inline void M6502State::setT(int T)
+  {
+    TP = this->T = T ;
+  }
+
+  inline void M6502State::setTP(int TP)
+  {
+    this->TP = TP ;
+  }
+
+  inline void M6502State::setIRQLine(bool x)
+  {
+    irqLine = x ;
+  }
+
+  inline void M6502State::setNMILine(bool x)
+  {
+    nmiLine = x ;
+  }
+
+  inline void M6502State::setResetLine(bool x)
+  {
+    resetLine = x ;
+  }
+
+  inline void M6502State::setP(std::uint8_t x)
+  {
+    P = x ;
+  }
+  
+  inline size_t M6502State::getNumCycles() const
   {
     return numCycles ;
+  }
+
+  inline void M6502State::setNumCycles(size_t n)
+  {
+    numCycles = n ;
   }
 
   inline bool M6502::getVerbose() const
   {
     return verbose ;
-  }
-
-  inline void M6502::setA(std::uint8_t A)
-  {
-    this->A = A ;
-  }
-
-  inline void M6502::setX(std::uint8_t X)
-  {
-    this->X = X ;
-  }
-
-  inline void M6502::setY(std::uint8_t Y)
-  {
-    this->Y = Y ;
-  }
-
-  inline void M6502::setPC(std::uint16_t addr)
-  {
-    PCP = PC = addr ;
-  }
-
-  inline void M6502::setIR(std::uint8_t IR)
-  {
-    this->IR = IR ;
-  }
-
-  inline void M6502::setT(int T)
-  {
-    TP = this->T = T ;
-  }
-
-  inline void M6502::setIRQLine(bool x)
-  {
-    irqLine = x ;
-  }
-
-  inline void M6502::setNMILine(bool x)
-  {
-    nmiLine = x ;
-  }
-
-  inline void M6502::setResetLine(bool x)
-  {
-    resetLine = x ;
-  }
-
-  inline void M6502::setP(std::uint8_t x)
-  {
-    P = x ;
   }
 
   inline void M6502::setVerbose(bool x)
@@ -411,9 +464,6 @@ namespace jigo {
   // -------------------------------------------------------------------
   // MARK: - Input & Output
   // -------------------------------------------------------------------
-
-  void to_json(nlohmann::json& j, M6502State const& state) ;
-  void from_json(nlohmann::json const& j, M6502State& state) ;
 
   template<class T> struct asBytesWrapper
   {

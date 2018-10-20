@@ -111,7 +111,7 @@ void jigo::to_json(json& j, const M6502State& s)
   jput(PC) ;
   jput(IR) ;
   j["P"] = static_cast<uint8_t>(s.P);
-  jput(PCCurrent) ;
+  jput(PCIR) ;
   jput(PCP) ;
   jput(AD) ;
   jput(T) ;
@@ -137,7 +137,7 @@ void jigo::from_json(const json& j, M6502State& state)
   jget(PC) ;
   jget(IR) ;
   state.P = static_cast<uint8_t>(j.at("P")) ;
-  jget(PCCurrent) ;
+  jget(PCIR) ;
   jget(PCP) ;
   jget(AD) ;
   jget(T) ;
@@ -460,7 +460,7 @@ bool M6502State::operator==(M6502State const& s) const {
   return cmp(RW) && cmp(addressBus) && cmp(dataBus) &&
   cmp(resetLine) && cmp(nmiLine) && cmp(irqLine) &&
   cmp(A) && cmp(X) && cmp(Y) && cmp(S) &&
-  cmp(P) && cmp(PC) && cmp(PCCurrent) && cmp(PCP) &&
+  cmp(P) && cmp(PC) && cmp(PCIR) && cmp(PCP) &&
   cmp(IR) && cmp(AD) && cmp(ADD) && cmp(T) &&
   cmp(TP) && cmp(numCycles) ;
 }
@@ -765,7 +765,7 @@ void M6502::cycle(bool busWasReady)
       // TODO: recovery from KIL on reset.
     } else {
       IR = dataBus ;
-      PCCurrent = addressBus ;
+      PCIR = addressBus ;
     }
     dc = decode(IR) ;
   }
@@ -1100,7 +1100,7 @@ void M6502::cycle(bool busWasReady)
       if (dc.instructionType == PLA) {
         setNZ(A = dataBus) ;
       } else {
-        setP(dataBus) ;
+        P = dataBus ;
       }
       fetch() ;
     }
@@ -1150,7 +1150,7 @@ void M6502::cycle(bool busWasReady)
     if (T == 1) {fetch();} // Discarded.
     else if (T == 2) {readFrom(0x100 + S++);} // Discarded.
     else if (T == 3) {readFrom(0x100 + S++);}
-    else if (T == 4) {setP(dataBus); readFrom(0x100 + S++);}
+    else if (T == 4) {P = dataBus; readFrom(0x100 + S++);}
     else if (T == 5) {AD = dataBus; readFrom(0x100 + S); TP = -1;}
     else if (T == 0) {
       PC = (AD |= uint16_t(dataBus) << 8) ;
@@ -1187,7 +1187,7 @@ void M6502::cycle(bool busWasReady)
     << endl ;
   }
 
-  // Count cycles.
+  // One more cycle completed.
   numCycles ++ ;
 }
 

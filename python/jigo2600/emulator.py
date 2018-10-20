@@ -20,462 +20,9 @@ import sys
 
 import sdl2
 import jigo2600
-from jigo2600 import Atari2600, Cartridge
-
-# -------------------------------------------------------------------
-# Peripherals
-# -------------------------------------------------------------------
-
-
-class Panel(Atari2600.Panel):
-    def __init__(self):
-        Atari2600.Panel.__init__(self)
-
-    def __eq__(self, other):
-        return type(other) is Panel and self.get_value() == other.get_value()
-
-    def __deepcopy__(self, memo):
-        p = Panel()
-        p.set_value(self.get_value())
-        return p
-
-    def __getitem__(self, sw):
-        return self.get_switch(sw)
-
-    def __setitem__(self, sw, x):
-        return self.set_switch(sw, x)
-
-
-class Joystick(Atari2600.Joystick):
-    def __init__(self):
-        Atari2600.Joystick.__init__(self)
-
-    def __eq__(self, other):
-        return type(other) is Joystick and self.get_value() == other.get_value()
-
-    def __deepcopy__(self, memo):
-        j = Joystick()
-        j.set_value(self.get_value())
-        return j
-
-    def __getitem__(self, sw):
-        return self.get_switch(sw)
-
-    def __setitem__(self, sw, x):
-        return self.set_switch(sw, x)
-
-
-class Paddle(Atari2600.Paddle):
-    def __init__(self):
-        Atari2600.Paddle.__init__(self)
-
-    def __eq__(self, other):
-        return type(other) is Paddle and self.fire == other.fire and self.angle == other.angle
-
-    def __deepcopy__(self, memo):
-        p = Paddle()
-        p.angle = self.angle
-        p.fire = self.fire
-        return p
-
-
-class Input():
-    class Type(enum.Enum):
-        NONE = 0
-        JOYSTICK = 1
-        KEYBOARD = 2
-        PADDLE = 3
-
-    def __init__(self, peripheral_type=Type.NONE):
-        self.frame_number = 0
-        self.panel = Panel()
-        self.set_peripheral_type(peripheral_type)
-
-    def __eq__(self, other):
-        return (
-            self.panel == other.panel and
-            self.peripheral_type == other.peripheral_type and
-            self.peripheral == other.peripheral
-        )
-
-    def set_peripheral_type(self, peripheral_type):
-        self.peripheral_type = peripheral_type
-        if peripheral_type == Input.Type.NONE:
-            self.peripheral = None
-        elif peripheral_type == Input.Type.JOYSTICK:
-            self.peripheral = [Joystick(), Joystick()]
-        elif peripheral_type == Input.Type.PADDLE:
-            self.peripheral = [Paddle() for k in range(4)]
-
-
-class InputEncoder(json.JSONEncoder):
-    def default(self, o):
-        if isinstance(o, Panel):
-            return o.get_value()
-        elif isinstance(o, Joystick):
-            return o.get_value()
-        elif isinstance(o, Input.Type):
-            return o.name
-        elif isinstance(o, Input):
-            return {
-                'frame_number': o.frame_number,
-                'panel': o.panel,
-                'peripheral_type': o.peripheral_type,
-                'peripherals': o.peripheral,
-            }
-        return super().default(o)
-
-# -------------------------------------------------------------------
-# Peripheral interfaces
-# -------------------------------------------------------------------
-
-class SDLDevice():
-    def __init__(self, joystick_index):
-        self.game_controller = None
-        self.joystick = None
-        self.joystick_id = None
-        if sdl2.SDL_IsGameController(joystick_index):
-            self.game_controller = sdl2.SDL_GameControllerOpen(
-                joystick_index)
-            self.joystick = sdl2.SDL_GameControllerGetJoystick(
-                self.game_controller)
-            self.joystick_id = sdl2.SDL_JoystickInstanceID(self.joystick)
-            self.name = sdl2.SDL_GameControllerName(self.game_controller)
-        else:
-            self.joystick = sdl2.SDL_JoystickOpen(joystick_index)
-            self.joystick_id = sdl2.SDL_JoystickInstanceID(self.joystick)
-            self.name = sdl2.SDL_JoystickName(self.joystick)
-
-    def __del__(self):
-        if self.game_controller is not None:
-            if sdl2.SDL_GameControllerGetAttached(self.game_controller):
-                sdl2.SDL_GameControllerClose(self.game_controller)
-        else:
-            if sdl2.SDL_JoystickGetAttached(self.joystick):
-                sdl2.SDL_JoystickClose(self.joystick)
-
-    def __eq__(self, other):
-        if type(other) is not JoystickInterface.SDLDevice:
-            return False
-        if self.game_controller is None and other.game_controller is None:
-            return self.game_controller == other.game_controller
-        return self.joystick == other.joystick
-
-    def __str__(self):
-        return str(self.name)
-
-
-class SwitchesInterface():
-    def __init__(self):
-        self.keys = {
-            'color_mode': sdl2.SDLK_1,
-            'difficulty_left': sdl2.SDLK_2,
-            'difficulty_right': sdl2.SDLK_3,
-            'select': sdl2.SDLK_4,
-            'reset': sdl2.SDLK_BACKSPACE,
-        }
-
-    def update(self, key, input):
-        pressed = key.state is sdl2.SDL_PRESSED
-        if key.keysym.sym == self.keys['color_mode']:
-            input.panel[Panel.Switch.COLOR_MODE] ^= pressed
-            if pressed:
-                value = 'black-and-white' if input.panel[Panel.Switch.COLOR_MODE] else 'color'
-                print(f"TV type set to {value}")
-        elif key.keysym.sym == self.keys['difficulty_left']:
-            input.panel[Panel.Switch.DIFFICULTY_LEFT] ^= pressed
-            if pressed:
-                value = 'B' if input.panel[Panel.Switch.DIFFICULTY_LEFT] else 'A'
-                print(f"Difficulty left set to {value}")
-        elif key.keysym.sym == self.keys['difficulty_right']:
-            input.panel[Panel.Switch.DIFFICULTY_RIGHT] ^= pressed
-            if pressed:
-                value = 'B' if input.panel[Panel.Switch.DIFFICULTY_RIGHT] else 'A'
-                print(f"Difficulty right {value}")
-        elif key.keysym.sym == self.keys['select']:
-            input.panel[Panel.Switch.SELECT] = pressed
-            value = 'pressed' if input.panel[Panel.Switch.SELECT] else 'released'
-            print(f"Game select switch {value}")
-        elif key.keysym.sym == self.keys['reset']:
-            input.panel[Panel.Switch.RESET] = pressed
-            value = 'pressed' if input.panel[Panel.Switch.RESET] else 'released'
-            print(f"Game reset switch {value}")
-        else:
-            return False
-        return True
-
-
-class JoystickInterface():
-    class SDLDevice():
-        def __init__(self, joystick_index):
-            self.game_controller = None
-            self.joystick = None
-            self.joystick_id = None
-            if sdl2.SDL_IsGameController(joystick_index):
-                self.game_controller = sdl2.SDL_GameControllerOpen(
-                    joystick_index)
-                self.joystick = sdl2.SDL_GameControllerGetJoystick(
-                    self.game_controller)
-                self.joystick_id = sdl2.SDL_JoystickInstanceID(self.joystick)
-                self.name = sdl2.SDL_GameControllerName(self.game_controller)
-            else:
-                self.joystick = sdl2.SDL_JoystickOpen(joystick_index)
-                self.joystick_id = sdl2.SDL_JoystickInstanceID(self.joystick)
-                self.name = sdl2.SDL_JoystickName(self.joystick)
-
-        def __del__(self):
-            if self.game_controller is not None:
-                if sdl2.SDL_GameControllerGetAttached(self.game_controller):
-                    sdl2.SDL_GameControllerClose(self.game_controller)
-            else:
-                if sdl2.SDL_JoystickGetAttached(self.joystick):
-                    sdl2.SDL_JoystickClose(self.joystick)
-
-        def __eq__(self, other):
-            if type(other) is not JoystickInterface.SDLDevice:
-                return False
-            if self.game_controller is None and other.game_controller is None:
-                return self.game_controller == other.game_controller
-            return self.joystick == other.joystick
-
-        def __str__(self):
-            return str(self.name)
-
-    def __init__(self):
-        self.controllers = [None]*2
-        self.keys_state = [None]*2
-        for k in range(2):
-            self.keys_state[k] = {
-                'fire': False,
-                'up': False,
-                'down': False,
-                'left': False,
-                'right': False,
-            }
-        self.keys = [
-            {
-                'up': sdl2.SDLK_w,
-                'down': sdl2.SDLK_s,
-                'left': sdl2.SDLK_a,
-                'right': sdl2.SDLK_d,
-                'fire': sdl2.SDLK_SPACE,
-            },
-            {
-                'up': None,
-                'down': None,
-                'left': None,
-                'right': None,
-                'fire': None,
-            }
-        ]
-        self.AXIS_DEAD_ZONE = 8000
-
-    def associate_sdl_joystick(self, joystick_index, verbose=False):
-        device = JoystickInterface.SDLDevice(joystick_index)
-        for k in range(2):
-            if self.controllers[k] != device:
-                self.controllers[k] = device
-                if verbose:
-                    print(f"Associated device {device} to joystick {k}")
-                return True
-        return False
-
-    def disassociate_sdl_device(self, device_id):
-        for k in range(2):
-            if self.controllers[k].joystick == device_id and self.controllers[k].game_controller == device_id:
-                self.controllers[k] = None
-
-    def reset(self):
-        self.__init__()
-
-    def __del__(self):
-        self.reset()
-
-    def update(self, key, input):
-        for k in range(2):
-            joystick = input.peripheral[k]
-            if key.keysym.sym == self.keys[k]['fire']:
-                self.fire_key = key.state is sdl2.SDL_PRESSED
-                joystick[Joystick.Switch.FIRE] = self.fire_key
-                return True
-            elif key.keysym.sym == self.keys[k]['up']:
-                self.keys_state[k]['up'] = key.state is sdl2.SDL_PRESSED
-                joystick[Joystick.Switch.UP] = self.keys_state[k]['up']
-                joystick[Joystick.Switch.DOWN] = (self.keys_state[k]['down'] and
-                                                  not self.keys_state[k]['up'])
-                return True
-            elif key.keysym.sym == self.keys[k]['down']:
-                self.keys_state[k]['down'] = key.state is sdl2.SDL_PRESSED
-                joystick[Joystick.Switch.DOWN] = self.keys_state[k]['down']
-                joystick[Joystick.Switch.UP] = (self.keys_state[k]['up']
-                                                and not self.keys_state[k]['down'])
-                return True
-            elif key.keysym.sym == self.keys[k]['left']:
-                self.keys_state[k]['left'] = key.state is sdl2.SDL_PRESSED
-                joystick[Joystick.Switch.LEFT] = self.keys_state[k]['left']
-                joystick[Joystick.Switch.RIGHT] = (self.keys_state[k]['right']
-                                                   and not self.keys_state[k]['left'])
-                return True
-            elif key.keysym.sym == self.keys[k]['right']:
-                self.keys_state[k]['right'] = key.state is sdl2.SDL_PRESSED
-                joystick[Joystick.Switch.RIGHT] = self.keys_state[k]['right']
-                joystick[Joystick.Switch.LEFT] = (self.keys_state[k]['left']
-                                                  and not self.keys_state[k]['right'])
-                return True
-        return False
-
-    def update_sdl_joystick(self, event, input):
-        for k in range(2):
-            if not isinstance(self.controllers[k], JoystickInterface.SDLDevice):
-                continue
-            joystick = input.peripheral[k]
-            if event.type == sdl2.SDL_JOYAXISMOTION:
-                if event.jaxis.which == self.controllers[k].joystick_id:
-                    if event.jaxis.axis == 0:
-                        joystick[Joystick.Switch.LEFT] = event.jaxis.value < -self.AXIS_DEAD_ZONE
-                        joystick[Joystick.Switch.RIGHT] = event.jaxis.value > self.AXIS_DEAD_ZONE
-                        return True
-                    elif event.jaxis.axis == 1:
-                        joystick[Joystick.Switch.DOWN] = event.jaxis.value < -self.AXIS_DEAD_ZONE
-                        joystick[Joystick.Switch.UP] = event.jaxis.value > self.AXIS_DEAD_ZONE
-                        return True
-            elif event.type == sdl2.SDL_JOYBUTTONUP or event.type == sdl2.SDL_JOYBUTTONDOWN:
-                if event.jbutton.which == self.controllers[k].joystick_id:
-                    joystick[Joystick.Switch.FIRE] = (
-                        event.jbutton.state == sdl2.SDL_PRESSED)
-                    return True
-            elif event.type == sdl2.SDL_JOYHATMOTION:
-                if event.jhat.which == self.controllers[k].joystick_id:
-                    joystick.reset_directions()
-                    if event.jhat.value == sdl2.SDL_HAT_UP:
-                        joystick[Joystick.Switch.UP] = True
-                    elif event.jhat.value == sdl2.SDL_HAT_RIGHTUP:
-                        joystick[Joystick.Switch.UP] = True
-                        joystick[Joystick.Switch.RIGHT] = True
-                    elif event.jhat.value == sdl2.SDL_HAT_RIGHT:
-                        joystick[Joystick.Switch.RIGHT] = True
-                    elif event.jhat.value == sdl2.SDL_HAT_RIGHTDOWN:
-                        joystick[Joystick.Switch.RIGHT] = True
-                        joystick[Joystick.Switch.DOWN] = True
-                    elif event.jhat.value == sdl2.SDL_HAT_DOWN:
-                        joystick[Joystick.Switch.DOWN] = True
-                    elif event.jhat.value == sdl2.SDL_HAT_LEFTDOWN:
-                        joystick[Joystick.Switch.DOWN] = True
-                        joystick[Joystick.Switch.LEFT] = True
-                    elif event.jhat.value == sdl2.SDL_HAT_LEFT:
-                        joystick[Joystick.Switch.LEFT] = True
-                    elif event.jhat.value == sdl2.SDL_HAT_LEFTUP:
-                        joystick[Joystick.Switch.LEFT] = True
-                        joystick[Joystick.Switch.UP] = True
-                    return True
-        return False
-
-
-class PaddleInterface():
-    def __init__(self):
-        self.controllers = [None]*4
-        self.velocities = [0, 0, 0, 0]
-        self.keys = [
-            {
-                'left': sdl2.SDLK_a,
-                'right': sdl2.SDLK_d,
-                'fire': sdl2.SDLK_SPACE,
-            },
-            {
-                'left': None,
-                'right': None,
-                'fire': None,
-            },
-            {
-                'left': None,
-                'right': None,
-                'fire': None,
-            },
-            {
-                'left': None,
-                'right': None,
-                'fire': None,
-            }
-        ]
-        self.keys_state = [{
-            'fire': False,
-            'left': False,
-            'right': False,
-        } for k in range(4)]
-
-    def associate_sdl_joystick(self, joystick_index, verbose=False):
-        device = SDLDevice(joystick_index)
-        for k in range(4):
-            if self.controllers[k] != device:
-                self.controllers[k] = device
-                if verbose:
-                    print(f"Associated device {device} to paddle {k}")
-                return True
-        return False
-
-    def disassociate_sdl_device(self, device_id):
-        for k in range(2):
-            if self.controllers[k].joystick == device_id and self.controllers[k].game_controller == device_id:
-                self.controllers[k] = None
-
-    def reset(self):
-        self.__init__()
-
-    def __del__(self):
-        self.reset()
-
-    def update(self, key, input):
-        for k in range(4):
-            paddle = input.peripheral[k]
-            if key.keysym.sym == self.keys[k]['fire']:
-                paddle.fire = sdl2.SDL_PRESSED
-                return True
-            elif key.keysym.sym == self.keys[k]['left']:
-                self.keys_state[k]['left'] = key.state is sdl2.SDL_PRESSED
-                self.velocities[k] = -10 if self.keys_state[k]['left'] else +10 if self.keys_state[k]['right'] else 0
-                return True
-            elif key.keysym.sym == self.keys[k]['right']:
-                self.keys_state[k]['rigth'] = key.state is sdl2.SDL_PRESSED
-                self.velocities[k] = +10 if self.keys_state[k]['rigth'] else -10 if self.keys_state[k]['right'] else 0
-                return True
-        return False
-
-    def update_sdl_joystick(self, event, input):
-        for k in range(4):
-            if not isinstance(self.controllers[k], SDLDevice):
-                continue
-            paddle = input.peripheral[k]
-            if event.type == sdl2.SDL_JOYAXISMOTION:
-                if event.jaxis.which == self.controllers[k].joystick_id:
-                    if event.jaxis.axis == 0:
-                        self.velocities[k] = event.jaxis.value / 10
-                        return True
-            elif event.type == sdl2.SDL_JOYBUTTONUP or event.type == sdl2.SDL_JOYBUTTONDOWN:
-                if event.jbutton.which == self.controllers[k].joystick_id:
-                    paddle.fire = (
-                        event.jbutton.state == sdl2.SDL_PRESSED)
-                    return True
-            elif event.type == sdl2.SDL_JOYHATMOTION:
-                if event.jhat.which == self.controllers[k].joystick_id:
-                    if (
-                            event.jhat.value == sdl2.SDL_HAT_RIGHTUP or
-                            event.jhat.value == sdl2.SDL_HAT_RIGHT or
-                            event.jhat.value == sdl2.SDL_HAT_RIGHTDOWN
-                    ):
-                        self.velocities[k] = 10
-                        return True
-                    if (
-                            event.jhat.value == sdl2.SDL_HAT_LEFTUP or
-                            event.jhat.value == sdl2.SDL_HAT_LEFT or
-                            event.jhat.value == sdl2.SDL_HAT_LEFTDOWN
-                    ):
-                        self.velocities[k] = -10
-                        return True
-        return False
-
-    def integrate(self, input):
-        for k in range(4):
-            input.peripheral[k].angle += self.velocities[k]
+from jigo2600 import Atari2600, Cartridge, TIA
+from jigo2600.peripheral import *
+import jigo2600.debug as debug
 
 # -------------------------------------------------------------------
 # CommandPrompt
@@ -500,18 +47,16 @@ class CommandPrompt(cmd.Cmd):
         self.game.done = True
 
     def do_save(self, line):
-        data = self.game.atari.save_state().to_json()
         with open(os.path.expanduser('~/Desktop/state.json'), 'w') as f:
-            f.write(data)
+            self.game.save_state(f)
         with open(os.path.expanduser('~/Desktop/inputs.json'), 'w') as f:
-            f.write(json.dumps(self.game.inputs, indent=4, cls=InputEncoder))
+            self.game.save_input_stream(f)
 
     def do_load(self, line):
         with open(os.path.expanduser('~/Desktop/state.json'), 'r') as f:
-            data = f.read()
-        state = self.game.atari.make_state()
-        state.from_json(data)
-        self.game.atari.load_state(state)
+            self.game.load_state(f)
+        with open(os.path.expanduser('~/Desktop/inputs.json'), 'r') as f:
+            self.game.load_input_stream(f)
 
     def do_info(self, line):
         print(f"Frame number: {self.game.atari.frame_number}")
@@ -523,6 +68,9 @@ class CommandPrompt(cmd.Cmd):
     def do_replay(self, reply_path):
         pass
 
+    def do_debug_info(self, line):
+        print(debug.cpu_info(self.game.atari.cpu))
+        print(debug.pia_info(self.game.atari.pia))
 
 def print_cart_meta(cart_meta):
     print(f'Cartridge metadata')
@@ -532,6 +80,7 @@ def print_cart_meta(cart_meta):
     print(f'* Type:           {cart_meta["cartridgeType"]}')
     print(f'* Size:           {cart_meta["size"]} B')
     print(f'* SHA1:           {cart_meta["sha1"]}')
+    print(f'* Peripheral:     {cart_meta["peripheral"]}')
 
 
 # -------------------------------------------------------------------
@@ -554,7 +103,7 @@ class Emulator():
         self.switches_interface = SwitchesInterface()
         self.joysticks_interface = JoystickInterface()
         self.paddles_interface = PaddleInterface()
-        self.inputs = []
+        self.input_stream = InputStream()
         self.has_sdl_audio = False
         self.has_sdl_gamecontroller = False
         self.has_sdl_joystick = False
@@ -626,13 +175,6 @@ class Emulator():
                 else:
                     print(f"Loaded {n} game controller mappings")
 
-    def reset_input_log(self, peripheral_type):
-        self.inputs = []
-        input = Input()
-        input.set_peripheral_type(peripheral_type)
-        self.inputs.clear()
-        self.inputs.append(input)
-
     def __del__(self):
         del self.joysticks_interface
         if self.has_sdl_gamecontroller:
@@ -653,7 +195,8 @@ class Emulator():
         rate = self.atari.color_clock_rate / self.audio_buffer_rate * self.speed
         self.atari.get_audio_samples(memoryview(array.contents), rate)
 
-    def load_cart(self, cart_path, cart_type=Cartridge.Type.UNKNOWN, video_standard=None, peripheral_type=Input.Type.JOYSTICK):
+    def load_cart(self, cart_path, cart_type=Cartridge.Type.UNKNOWN,
+                  video_standard=None, peripheral_type=None):
         # Load the cartridge data.
         if args.verbosity > 0:
             print(f'Cartridge file path: {cart_path}')
@@ -670,11 +213,14 @@ class Emulator():
         if match:
             self.cart_meta = match[0]
             if video_standard is None:
-                video_standard = Atari2600.VideoStandard.__members__[
+                video_standard = TIA.VideoStandard.__members__[
                     self.cart_meta['standard']]
             if self.cart_type is Cartridge.Type.UNKNOWN:
                 self.cart_type = Cartridge.Type.__members__[
                     self.cart_meta['cartridgeType'].upper()]
+            if peripheral_type is None:
+                peripheral_type = Input.Type.__members__[
+                    self.cart_meta['peripheral'].upper()]
         else:
             self.cart_meta = None
 
@@ -696,39 +242,29 @@ class Emulator():
                 print_cart_meta(self.cart_meta)
 
         # Prepare input.
-        self.reset_input_log(peripheral_type)
-
-    def find_input(self, frame_number):
-        def xsearch(i, j):
-            if self.inputs[j].frame_number <= frame_number:
-                return j
-            k = (i + j) // 2
-            if self.inputs[k].frame_number <= frame_number:
-                return xsearch(k, j-1)
-            else:
-                return xsearch(i, k-1)
-        return xsearch(0, len(self.inputs) - 1)
-
-    def retrieve_input(self, frame_number):
-        return self.inputs[self.find_input(frame_number)]
-
-    def set_input(self, frame_number, input):
-        "Write an input entry to the log."
-        "The actual entry rather than a copy of it is entered in the log."
-        "Entries are elided if they are redundant."
-        input.frame_number = frame_number
-        i = self.find_input(frame_number)
-        if self.inputs[i].frame_number < frame_number:
-            if self.inputs[i] != input:
-                self.inputs.insert(i + 1, input)
-        else:
-            self.inputs[i] = input
-
-    def set_peripheral_type(self, peripheral_type):
-        self.peripheral_type = peripheral_type
+        if peripheral_type is None:
+            peripheral_type = Input.Type.JOYSTICK
+        self.input_stream.reset(peripheral_type)
 
     def reset(self):
         self.atari.reset()
+
+    def load_state(self, f):
+        data = f.read()
+        state = self.atari.make_state()
+        state.from_json(data)
+        self.atari.load_state(state)
+
+    def save_state(self, f):
+        data = self.atari.save_state().to_json()
+        f.write(data)
+
+    def load_input_stream(self, f):
+        data = json.load(f)
+        self.input_stream.load_json(data)
+
+    def save_input_stream(self, f):
+        json.dump(self.input_stream.to_json(), f, indent=4)
 
     def replay(self, replay_path):
         try:
@@ -746,7 +282,7 @@ class Emulator():
                   f"does not match the cartidge SHA1 ({self.cart_sha1})")
         frame_number = -1
         state = -1
-        self.reset_input_log(Input.Type.JOYSTICK)
+        self.input_stream.reset(Input.Type.JOYSTICK)
         for line in inputs:
             if state == -1 and line == '[Input]':
                 state = 0
@@ -775,12 +311,10 @@ class Emulator():
                 input.peripheral[k][Joystick.Switch.LEFT] = get(9 + 6*k)
                 input.peripheral[k][Joystick.Switch.RIGHT] = get(10 + 6*k)
                 input.peripheral[k][Joystick.Switch.FIRE] = get(11 + 6*k)
-            if len(self.inputs) > 0 and self.inputs[-1] == input:
-                continue
-            self.set_input(frame_number, input)
+            self.input_stream[frame_number] = input
         if self.verbosity > 0:
             print(f"Loaded replay data {replay_path}")
-            print(f"Sourced {len(self.inputs)} input events for replay")
+            print(f"Sourced {len(self.input_stream)} input events for replay")
 
     def run(self):
         prompt = CommandPrompt(self)
@@ -800,7 +334,7 @@ class Emulator():
         cpu_clock_rate = self.atari.color_clock_rate / 3
         reasons = [Atari2600.StoppingReason.FRAME_DONE]
 
-        current_input = self.retrieve_input(self.atari.frame_number)
+        current_input = self.input_stream[self.atari.frame_number]
         new_input = copy.deepcopy(current_input)
 
         while not self.done:
@@ -822,8 +356,6 @@ class Emulator():
             period = 0.95 * period + 0.05 * elapsed
 
             # Parse the SDL events.
-            input_detected = False
-
             while sdl2.SDL_PollEvent(ctypes.byref(event)) != 0:
                 if event.type == sdl2.SDL_QUIT:
                     self.done = True
@@ -844,15 +376,12 @@ class Emulator():
                             print(f"Speed decreased to {self.speed}")
                             continue
                     if self.switches_interface.update(event.key, new_input):
-                        input_detected = True
                         continue
                     if new_input.peripheral_type == Input.Type.JOYSTICK:
                         if self.joysticks_interface.update(event.key, new_input):
-                            input_detected = True
                             continue
                     elif new_input.peripheral_type == Input.Type.PADDLE:
                         if self.paddles_interface.update(event.key, new_input):
-                            input_detected = True
                             continue
                 elif event.type == sdl2.SDL_WINDOWEVENT:
                     if event.window.event == sdl2.SDL_WINDOWEVENT_RESIZED:
@@ -871,13 +400,11 @@ class Emulator():
                         event.type == sdl2.SDL_JOYBUTTONUP or
                         event.type == sdl2.SDL_JOYBUTTONDOWN
                 ):
-                    if input.peripheral_type == Input.Type.JOYSTICK:
-                        if self.joysticks_interface.update_sdl_joystick(event.key, new_input):
-                            input_detected = True
+                    if new_input.peripheral_type == Input.Type.JOYSTICK:
+                        if self.joysticks_interface.update_sdl_joystick(event, new_input):
                             continue
-                    elif input.peripheral_type == Input.Type.PADDLE:
-                        if self.paddles_interface.update_sdl_joystick(event.key, new_input):
-                            input_detected = True
+                    elif new_input.peripheral_type == Input.Type.PADDLE:
+                        if self.paddles_interface.update_sdl_joystick(event, new_input):
                             continue
 
             # Parse the console events.
@@ -891,7 +418,7 @@ class Emulator():
                     print(">>> ", end='', flush=True)
 
             # Simulate an amount of CPU cycles equivalent to the real time elapsed.
-            # Limit this to roughly two video frames frames.
+            # Limit this to roughly two video frames.
             if not self.paused:
                 remaining_cycles += cpu_clock_rate * elapsed * self.speed
                 remaining_cycles = int(
@@ -901,18 +428,17 @@ class Emulator():
                     if Atari2600.StoppingReason.FRAME_DONE in reasons:
                         if new_input.peripheral_type == Input.Type.PADDLE:
                             self.paddles_interface.integrate(new_input)
-    
+
                     # Feed the *current* input to the console.
                     if new_input != current_input:
-                        self.set_input(self.atari.frame_number, new_input)
-                    current_input = self.retrieve_input(self.atari.frame_number)
+                        self.input_stream[self.atari.frame_number] = new_input
+                    current_input = self.input_stream[self.atari.frame_number]
                     self.atari.set_panel(current_input.panel)
                     if current_input.peripheral_type == Input.Type.JOYSTICK:
                         for k in range(2):
                             self.atari.set_joystick(k, current_input.peripheral[k])
                     elif current_input.peripheral_type == Input.Type.PADDLE:
                         for k in range(4):
-                            print(self.paddles_interface.velocities[k], new_input.peripheral[k].angle)
                             self.atari.set_paddle(k, current_input.peripheral[k])
                     new_input = copy.deepcopy(current_input)
 
@@ -970,9 +496,9 @@ if __name__ == "__main__":
                         action='store_true', help="disable audio")
     parser.add_argument("-s", "--video-standard",
                         type=str,
-                        choices=list(Atari2600.VideoStandard.__members__),
+                        choices=list(TIA.VideoStandard.__members__),
                         default=None,
-                        action=make_enum(Atari2600.VideoStandard),
+                        action=make_enum(TIA.VideoStandard),
                         help="set the Atari2600 video standard")
     parser.add_argument("-t", "--cart-type",
                         type=str,
@@ -987,7 +513,7 @@ if __name__ == "__main__":
     parser.add_argument("-p", "--peripheral",
                         type=str,
                         choices=list(Input.Type.__members__),
-                        default=Input.Type.JOYSTICK,
+                        default=None,
                         action=make_enum(Input.Type),
                         help="set the attached peripheral type")
     args = parser.parse_args()

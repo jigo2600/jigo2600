@@ -1,0 +1,22 @@
+UseTab: false
+IndentWidth: 2
+PointerAlignment: Left
+ConstructorInitializerIndentWidth: 1
+AllowShortIfStatementsOnASingleLine: false
+IndentCaseLabels: false
+ColumnLimit: 80
+AlignEscapedNewlines: true
+AllowShortCaseLabelsOnASingleLine: true
+AllowShortFunctionsOnASingleLine: InlineOnly
+AllowShortIfStatementsOnASingleLine: true
+CompactNamespaces: true
+Cpp11BracedListStyle: true
+FixNamespaceComments: true
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterEnum: false
+  AfterStruct: false
+  AfterControlStatement: false
+  AfterFunction: false
+  SplitEmptyFunction: false
+

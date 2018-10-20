@@ -4,6 +4,7 @@
 // Copyright (c) 2018 The Jigo2600 Team. All rights reserved.
 // This file is part of Jigo2600 and is made available under
 // the terms of the BSD license (see the COPYING file).
+
 #ifndef Atari2600_hpp
 #define Atari2600_hpp
 
@@ -20,7 +21,7 @@
 namespace jigo {
   class Atari2600 ;
   enum class Atari2600Error : int { success, cartridgeTypeMismatch } ;
-
+  
   // -----------------------------------------------------------------
   // MARK: - Cartridge
   // -----------------------------------------------------------------
@@ -97,7 +98,7 @@ namespace jigo {
 
   struct Atari2600BreakPoint
   {
-    std::uint16_t address ;
+    std::uint32_t virtualAddress ;
     bool persistent ;
     bool temporary ;
   } ;
@@ -108,7 +109,7 @@ namespace jigo {
     Atari2600State() ;
     Atari2600State(std::shared_ptr<M6502State> cpu,
                    std::shared_ptr<M6532State> pia,
-                   std::shared_ptr<jigo::TIAState> tia,
+                   std::shared_ptr<TIAState> tia,
                    std::shared_ptr<Atari2600CartridgeState> cartridge = nullptr) ;
     virtual ~Atari2600State() = default ;
 
@@ -133,10 +134,10 @@ namespace jigo {
     struct DecodedAddress
     {
       DecodedAddress(uint32_t address, bool RW) ;
-      std::uint32_t address ; /// Virtual address.
+      std::uint32_t address ; /// Addres as on the bus.
       bool Rw ; /// Read-write flag.
       enum { Cartridge, TIA, PIA } device ;
-      jigo::TIAState::Register tiaRegister ;
+      TIAState::Register tiaRegister ;
       M6532State::Register piaRegister ;
     } ;
 
@@ -160,6 +161,10 @@ namespace jigo {
     std::shared_ptr<Atari2600State> makeState() const ;
     
     // Debug.
+    std::uint8_t peek(std::uint32_t virtualAddress) const ;
+    void poke(std::uint32_t virtualAddress, std::uint8_t data) ;
+    void dump(std::uint8_t * data, std::uint32_t virtualAddress, size_t size) const ;
+    
     uint32_t virtualizeAddress(uint16_t address) const ;
     uint8_t const * dataForVirtualAddress(std::uint32_t virtualAddress) const ;
     uint8_t * mutableDataForVirtualAddress(std::uint32_t virtualAddress) ; // todo: think if we really want this
