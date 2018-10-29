@@ -136,7 +136,7 @@ public:
   bool getVerbose() const { return verbose; }
 
   // Access the screen.
-  static int constexpr topMargin = 37 - 12;
+  static int constexpr topMargin = 37 - 2;
   static int constexpr screenHeight = 192 + 11;
   static int constexpr screenWidth = 160;
   static float constexpr pixelAspectRatio = 1.8f;
