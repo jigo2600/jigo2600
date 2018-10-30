@@ -5,54 +5,54 @@
 // This file is part of Jigo2600 and is made available under
 // the terms of the BSD license (see the COPYING file).
 
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
 #include <Atari2600.hpp>
 #include <M6502Disassembler.hpp>
-#include <string>
-#include <sstream>
 #include <cstdint>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <sstream>
+#include <string>
 
-namespace py = pybind11 ;
-using namespace jigo ;
-using namespace std ;
-using namespace pybind11::literals ;
-using json = nlohmann::json ;
+namespace py = pybind11;
+using namespace jigo;
+using namespace std;
+using namespace pybind11::literals;
+using json = nlohmann::json;
 
 // ------------------------------------------------------------------
 // Helpers
 // ------------------------------------------------------------------
 
-template<typename T>
-string to_json(const T& state) {
-  json j ;
-  to_json(j, state) ;
-  return j.dump() ;
+template <typename T> string to_json(const T& state) {
+  json j;
+  to_json(j, state);
+  return j.dump();
 }
 
-template<typename T>
-void from_json(T& state, const string& str) {
-  auto j = json::parse(str) ;
-  from_json(j, state) ;
+template <typename T> void from_json(T& state, const string& str) {
+  auto j = json::parse(str);
+  from_json(j, state);
 }
 
 struct VideoFrame {
   VideoFrame(std::shared_ptr<const Atari2600> simulator, int time)
-  : simulator(simulator) { 
-    assert(simulator) ;
+   : simulator(simulator) {
+    assert(simulator);
     if (time >= 0) {
-      argb = simulator->getTia()->getCurrentScreen() ;
+      argb = simulator->getTia()->getCurrentScreen();
     } else {
-      argb = simulator->getTia()->getLastScreen() ;
+      argb = simulator->getTia()->getLastScreen();
     }
   }
-  std::shared_ptr<const Atari2600> simulator ;
-  uint32_t const * argb ;
-} ;
+  std::shared_ptr<const Atari2600> simulator;
+  uint32_t const* argb;
+};
 
 struct CartridgeTypeMismatchException : public std::exception {
-    virtual const char * what() const noexcept override { return "Cartridge type mismatch."; }
-} ;
+  virtual const char* what() const noexcept override {
+    return "Cartridge type mismatch.";
+  }
+};
 
 // ------------------------------------------------------------------
 // Enumerations
@@ -62,16 +62,16 @@ enum class Atari2600StoppingReason {
   frameDone = Atari2600::StoppingReason::frameDone,
   breakpoint = Atari2600::StoppingReason::breakpoint,
   numClocksReached = Atari2600::StoppingReason::numCyclesReached,
-} ;
+};
 
 vector<Atari2600StoppingReason> to_vector(Atari2600::StoppingReason const& r) {
-  auto r_ = vector<Atari2600StoppingReason>() ;
-  using in = Atari2600::StoppingReason ;
-  using out = Atari2600StoppingReason ;
-  if (r[in::frameDone])        r_.push_back(out::frameDone) ; 
-  if (r[in::breakpoint])       r_.push_back(out::breakpoint) ;
-  if (r[in::numCyclesReached]) r_.push_back(out::numClocksReached) ;
-  return r_ ;
+  auto r_ = vector<Atari2600StoppingReason>();
+  using in = Atari2600::StoppingReason;
+  using out = Atari2600StoppingReason;
+  if (r[in::frameDone]) r_.push_back(out::frameDone);
+  if (r[in::breakpoint]) r_.push_back(out::breakpoint);
+  if (r[in::numCyclesReached]) r_.push_back(out::numClocksReached);
+  return r_;
 }
 
 // ------------------------------------------------------------------
@@ -79,9 +79,10 @@ vector<Atari2600StoppingReason> to_vector(Atari2600::StoppingReason const& r) {
 // ------------------------------------------------------------------
 
 PYBIND11_MODULE(core, m) {
-  m.doc() = "Jigo2600 emulator" ;
+  m.doc() = "Jigo2600 emulator";
 
-  static py::exception<CartridgeTypeMismatchException> exc(m, "CartridgeTypeMismatchException");
+  static py::exception<CartridgeTypeMismatchException> exc(
+      m, "CartridgeTypeMismatchException");
 
   // ----------------------------------------------------------------
   // MARK: M6502
@@ -91,8 +92,10 @@ PYBIND11_MODULE(core, m) {
   m6502state.def_property("RW", &M6502State::getRW, &M6502State::getRW)
       .def_property("address_bus", &M6502State::getAddressBus, &M6502State::setAddressBus)
       .def_property("reset_line", &M6502State::getResetLine, &M6502State::setResetLine)
-      .def_property("data_bus", static_cast<std::uint8_t (M6502State::*)() const>(&M6502State::getDataBus),
-                    &M6502State::setDataBus)
+      .def_property(
+          "data_bus",
+          static_cast<std::uint8_t (M6502State::*)() const>(&M6502State::getDataBus),
+          &M6502State::setDataBus)
       .def_property("irq_line", &M6502State::getIRQLine, &M6502State::setIRQLine)
       .def_property("nmi_line", &M6502State::getNMILine, &M6502State::setNMILine)
       .def_property("A", &M6502State::getA, &M6502State::setA)
@@ -116,24 +119,29 @@ PYBIND11_MODULE(core, m) {
       .def("reset", &M6502::reset)
       .def("cycle", &M6502::cycle)
       .def_property("verbose", &M6502::getVerbose, &M6502::setVerbose)
-      .def_static("decode", static_cast<M6502::InstructionTraits const& (*)(std::uint8_t)>(&M6502::decode))
+      .def_static(
+          "decode",
+          static_cast<M6502::InstructionTraits const& (*)(std::uint8_t)>(&M6502::decode))
       .def_static("decode_bytes",
-                  static_cast<M6502::Instruction (*)(std::array<std::uint8_t, 3> const&)>(&M6502::decode))
+                  static_cast<M6502::Instruction (*)(std::array<std::uint8_t, 3> const&)>(
+                      &M6502::decode))
       .def_static("disassemble", [](py::buffer b) {
-             auto info = b.request();
-             // if (info.format != py::format_descriptor<uint8_t>::format()) {
-             //   throw std::runtime_error("Incompatible format: expected a char buffer.") ;
-             // }
-             if (info.itemsize != 1 || info.ndim != 1 || info.strides[0] != 1) {
-               throw std::runtime_error("Incompatible format: expected a 1D linear buffer of bytes.");
-             }
-             auto begin = static_cast<uint8_t*>(info.ptr);
-             auto end = begin + info.shape[0];
-             return disassembleM6502memory(begin, end);
-           });
+        auto info = b.request();
+        // if (info.format != py::format_descriptor<uint8_t>::format()) {
+        //   throw std::runtime_error("Incompatible format: expected a char buffer.") ;
+        // }
+        if (info.itemsize != 1 || info.ndim != 1 || info.strides[0] != 1) {
+          throw std::runtime_error(
+              "Incompatible format: expected a 1D linear buffer of bytes.");
+        }
+        auto begin = static_cast<uint8_t*>(info.ptr);
+        auto end = begin + info.shape[0];
+        return disassembleM6502memory(begin, end);
+      });
 
 #define it(x) .value(#x, M6502::InstructionType::x)
   py::enum_<M6502::InstructionType>(m6502, "InstructionType")
+      // clang-format off
     it(ADC) it(AND) it(ASL) it(BCC) it(BCS)
     it(BEQ) it(BIT) it(BMI) it(BNE) it(BPL)
     it(BRK) it(BVC) it(BVS) it(CLC) it(CLD)
@@ -150,7 +158,8 @@ PYBIND11_MODULE(core, m) {
     it(DCP) it(ISC) it(KIL) it(LAS) it(LAX)
     it(RLA) it(RRA) it(SAX) it(SHX) it(SHY)
     it(SLO) it(SRE) it(TAS) it(XAA) it(UNKNOWN)
-  ;
+      // clang-format on
+      ;
 #undef it
 
   py::enum_<M6502::AccessType>(m6502, "AccessType")
@@ -182,8 +191,7 @@ PYBIND11_MODULE(core, m) {
       .value("Y_INDEXING", M6502::IndexingType::YIndexing);
 
   py::class_<M6502::InstructionTraits> is(m6502, "InstructionTraits");
-  is
-      .def_readwrite("opcode", &M6502::InstructionTraits::opcode)
+  is.def_readwrite("opcode", &M6502::InstructionTraits::opcode)
       .def_readwrite("length", &M6502::InstructionTraits::length)
       .def_readwrite("mnemonic", &M6502::InstructionTraits::mnemonic)
       .def_readwrite("instruction_type", &M6502::InstructionTraits::instructionType)
@@ -206,30 +214,28 @@ PYBIND11_MODULE(core, m) {
         return oss.str();
       });
 
-
- 
   // ----------------------------------------------------------------
   // MARK: M6532
   // ----------------------------------------------------------------
 
   struct Memory {
-    std::uint8_t *begin ;
-    std::uint8_t *end ;
-  } ;
+    std::uint8_t* begin;
+    std::uint8_t* end;
+  };
 
-//  py::class_<Memory> 
+  //  py::class_<Memory>
   py::class_<M6532State, shared_ptr<M6532State>> m6532state(m, "M6532State");
   m6532state.def(py::init<>())
-      .def_property_readonly("ram", [](M6532State& self) {
-        return py::buffer_info(
-            begin(self.ram),
-            self.ram.size(),
-            py::format_descriptor<std::uint8_t>::format(),
-            1, // ndims
-            { self.ram.size() }, // dims
-            { 1 } // stides
-        );
-      })
+      .def_property_readonly("ram",
+                             [](M6532State& self) {
+                               return py::buffer_info(
+                                   begin(self.ram), self.ram.size(),
+                                   py::format_descriptor<std::uint8_t>::format(),
+                                   1,                 // ndims
+                                   {self.ram.size()}, // dims
+                                   {1}                // stides
+                               );
+                             })
       .def_readwrite("port_A", &M6532State::portA)
       .def_readwrite("port_B", &M6532State::portB)
       .def_readwrite("ORA", &M6532State::ORA)
@@ -267,7 +273,8 @@ PYBIND11_MODULE(core, m) {
       .def("write_port_B", &M6532::writePortB)
       .def("reset", &M6532::reset)
       .def("cycle",
-           [](M6532& self, bool CS, bool RSnot, bool RW, std::uint16_t address, std::uint8_t data) {
+           [](M6532& self, bool CS, bool RSnot, bool RW, std::uint16_t address,
+              std::uint8_t data) {
              auto portChanged = self.cycle(CS, RSnot, RW, address, data);
              return std::make_tuple(portChanged, data);
            })
@@ -360,12 +367,15 @@ PYBIND11_MODULE(core, m) {
   // MARK: Cartridge
   // ----------------------------------------------------------------
 
-  py::class_<Atari2600CartridgeState, shared_ptr<Atari2600CartridgeState>> cartState(m, "CartridgeState");
+  py::class_<Atari2600CartridgeState, shared_ptr<Atari2600CartridgeState>> cartState(
+      m, "CartridgeState");
   cartState.def_property_readonly("type", &Atari2600CartridgeState::getType);
 
-  py::class_<Atari2600Cartridge, shared_ptr<Atari2600Cartridge>> cart(m, "Cartridge", cartState);
+  py::class_<Atari2600Cartridge, shared_ptr<Atari2600Cartridge>> cart(m, "Cartridge",
+                                                                      cartState);
   cart.def_property_readonly("size", &Atari2600Cartridge::getSize)
-      .def_property("verbosity", &Atari2600Cartridge::getVerbosity, &Atari2600Cartridge::setVerbosity)
+      .def_property("verbosity", &Atari2600Cartridge::getVerbosity,
+                    &Atari2600Cartridge::setVerbosity)
       .def("to_json", [](const Atari2600Cartridge& self) {
         json j;
         self.serialize(j);
@@ -395,12 +405,14 @@ PYBIND11_MODULE(core, m) {
           auto str = string(data);
           return makeCartridgeFromBytes(&*begin(str), &*end(str), type);
         },
-        "Make a new Atari2600 cartridge from a binary blob.", "bytes"_a, "type"_a = Atari2600Cartridge::Type::unknown);
+        "Make a new Atari2600 cartridge from a binary blob.", "bytes"_a,
+        "type"_a = Atari2600Cartridge::Type::unknown);
 
   py::class_<Atari2600State, shared_ptr<Atari2600State>>(m, "Atari2600State")
       .def(py::init<>())
       .def("to_json", [](const Atari2600State& self) -> string { return to_json(self); })
-      .def("from_json", [](Atari2600State& self, string const& str) { from_json(self, str); });
+      .def("from_json",
+           [](Atari2600State& self, string const& str) { from_json(self, str); });
 
   // ----------------------------------------------------------------
   // MARK: Emulator
@@ -413,23 +425,28 @@ PYBIND11_MODULE(core, m) {
              auto r = self.cycle(max_num_cpu_cycles);
              return py::make_tuple(to_vector(r), max_num_cpu_cycles);
            })
-      .def("get_current_frame", [](shared_ptr<const Atari2600> self) { return VideoFrame(self, 0); })
-      .def("get_last_frame", [](shared_ptr<const Atari2600> self) { return VideoFrame(self, -1); })
+      .def("get_current_frame",
+           [](shared_ptr<const Atari2600> self) { return VideoFrame(self, 0); })
+      .def("get_last_frame",
+           [](shared_ptr<const Atari2600> self) { return VideoFrame(self, -1); })
       .def("get_audio_samples",
            [](Atari2600& self, py::buffer b, double nominalRate) {
              auto info = b.request();
              // if (info.format != py::format_descriptor<uint8_t>::format()) {
-             //   throw std::runtime_error("Incompatible format: expected a char buffer.") ;
+             //   throw std::runtime_error("Incompatible format: expected a char buffer.")
+             //   ;
              // }
              if (info.itemsize != 1 || info.ndim != 1 || info.strides[0] != 1) {
-               throw std::runtime_error("Incompatible format: expected a 1D linear buffer of bytes.");
+               throw std::runtime_error(
+                   "Incompatible format: expected a 1D linear buffer of bytes.");
              }
              auto begin = static_cast<uint8_t*>(info.ptr);
              auto end = begin + info.shape[0];
              self.getTia()->getSound(0).resample(begin, end, false, nominalRate);
              self.getTia()->getSound(1).resample(begin, end, true, nominalRate);
            })
-      .def_property("video_standard", &Atari2600::getVideoStandard, &Atari2600::setVideoStandard)
+      .def_property("video_standard", &Atari2600::getVideoStandard,
+                    &Atari2600::setVideoStandard)
       .def_property("cartridge", &Atari2600::getCartridge, &Atari2600::setCartridge)
       .def_property_readonly("frame_number", &Atari2600::getFrameNumber)
       .def_property_readonly("color_cycle_number", &Atari2600::getColorCycleNumber)
@@ -439,7 +456,8 @@ PYBIND11_MODULE(core, m) {
            [](Atari2600& self, const Atari2600State& state) {
              auto error = self.loadState(state);
              switch (error) {
-             case Atari2600Error::cartridgeTypeMismatch: throw CartridgeTypeMismatchException();
+             case Atari2600Error::cartridgeTypeMismatch:
+               throw CartridgeTypeMismatchException();
              default: break;
              }
            })
@@ -452,8 +470,10 @@ PYBIND11_MODULE(core, m) {
       .def("virtualize_address", &Atari2600::virtualizeAddress)
       .def("set_breakpoint", &Atari2600::setBreakPoint)
       .def("clear_breakpoint", &Atari2600::clearBreakPoint)
-      .def("set_breakpoint_on_next_instruction", &Atari2600::setBreakPointOnNextInstruction)
-      .def("clear_break_on_next_instruction", &Atari2600::clearBreakPointOnNextInstruction)
+      .def("set_breakpoint_on_next_instruction",
+           &Atari2600::setBreakPointOnNextInstruction)
+      .def("clear_break_on_next_instruction",
+           &Atari2600::clearBreakPointOnNextInstruction)
       .def_property_readonly("cpu", [](const Atari2600& self) { return self.getCpu(); })
       .def_property_readonly("pia", [](const Atari2600& self) { return self.getPia(); })
       .def_property_readonly("tia", [](const Atari2600& self) { return self.getTia(); })
@@ -465,14 +485,18 @@ PYBIND11_MODULE(core, m) {
       .value("BREAKPOINT", Atari2600StoppingReason::breakpoint)
       .value("NUM_CLOCKS_REACHED", Atari2600StoppingReason::numClocksReached);
 
-  py::class_<VideoFrame, unique_ptr<VideoFrame>>(atari2600, "VideoFrame", py::buffer_protocol())
+  py::class_<VideoFrame, unique_ptr<VideoFrame>>(atari2600, "VideoFrame",
+                                                 py::buffer_protocol())
       .def_property_readonly("width", [](py::object self) { return TIA::screenWidth; })
       .def_property_readonly("height", [](py::object self) { return TIA::screenHeight; })
       .def_buffer([](const VideoFrame& self) -> py::buffer_info {
-        // TODO: pybind11 is going to support read only buffers and these should be used here.
-        return py::buffer_info(const_cast<uint32_t*>(self.argb), sizeof(char),
-                               py::format_descriptor<const char>::format(), 3, {TIA::screenHeight, TIA::screenWidth, 4},
-                               {sizeof(char) * 4 * TIA::screenWidth, sizeof(char) * 4, sizeof(char)});
+        // TODO: pybind11 is going to support read only buffers and these should be used
+        // here.
+        return py::buffer_info(
+            const_cast<uint32_t*>(self.argb), sizeof(char),
+            py::format_descriptor<const char>::format(), 3,
+            {TIA::screenHeight, TIA::screenWidth, 4},
+            {sizeof(char) * 4 * TIA::screenWidth, sizeof(char) * 4, sizeof(char)});
       });
 
   // ----------------------------------------------------------------
@@ -489,12 +513,16 @@ PYBIND11_MODULE(core, m) {
 
   py::class_<Atari2600::Panel> panel(atari2600, "Panel");
   panel.def(py::init<>())
-      .def("get_switch", [](const Atari2600::Panel& self,
-                            Atari2600PanelSwitch sw) { return static_cast<bool>(self[static_cast<int>(sw)]); })
-      .def("set_switch",
-           [](Atari2600::Panel& self, Atari2600PanelSwitch sw, bool value) { self[static_cast<int>(sw)] = value; })
-      .def("get_value", [](const Atari2600::Panel& self) { return static_cast<int>(self.to_ulong()); })
-      .def("set_value", [](Atari2600::Panel& self, int value) { self = Atari2600::Panel(value); });
+      .def("get_switch",
+           [](const Atari2600::Panel& self, Atari2600PanelSwitch sw) {
+             return static_cast<bool>(self[static_cast<int>(sw)]);
+           })
+      .def("set_switch", [](Atari2600::Panel& self, Atari2600PanelSwitch sw,
+                            bool value) { self[static_cast<int>(sw)] = value; })
+      .def("get_value",
+           [](const Atari2600::Panel& self) { return static_cast<int>(self.to_ulong()); })
+      .def("set_value",
+           [](Atari2600::Panel& self, int value) { self = Atari2600::Panel(value); });
 
   py::enum_<Atari2600PanelSwitch>(panel, "Switch")
       .value("RESET", Atari2600PanelSwitch::reset)
@@ -517,12 +545,18 @@ PYBIND11_MODULE(core, m) {
 
   py::class_<Atari2600::Joystick> joystick(atari2600, "Joystick");
   joystick.def(py::init<>())
-      .def("get_switch", [](const Atari2600::Joystick& self,
-                            Atari2600JoystickSwitch sw) { return static_cast<bool>(self[static_cast<int>(sw)]); })
+      .def("get_switch",
+           [](const Atari2600::Joystick& self, Atari2600JoystickSwitch sw) {
+             return static_cast<bool>(self[static_cast<int>(sw)]);
+           })
       .def("set_switch", [](Atari2600::Joystick& self, Atari2600JoystickSwitch sw,
                             bool value) { self[static_cast<int>(sw)] = value; })
-      .def("get_value", [](const Atari2600::Joystick& self) { return static_cast<int>(self.to_ulong()); })
-      .def("set_value", [](Atari2600::Joystick& self, int value) { self = Atari2600::Joystick(value); })
+      .def("get_value",
+           [](const Atari2600::Joystick& self) {
+             return static_cast<int>(self.to_ulong());
+           })
+      .def("set_value", [](Atari2600::Joystick& self,
+                           int value) { self = Atari2600::Joystick(value); })
       .def("reset_directions", [](Atari2600::Joystick& self) {
         self[Atari2600::Joystick::up] = false;
         self[Atari2600::Joystick::down] = false;
