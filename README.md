@@ -30,5 +30,6 @@ The Python driver is the easiest way to test the emulator.
 Versions
 --------
 
+* 1.0-beta3 (November 2018) - Cleanup and extended Python bindings.
 * 1.0-beta2 (October 2018) - Better packaging and peripherals support.
 * 1.0-beta1 (October 2018) - First release.

@@ -844,7 +844,7 @@ protected:
   bool BLVD{};                // In VDELBL.
   int counter{8};
   // Transient.
-  bool enabled;
+  bool enabled{};
   int stop{1};
 };
 

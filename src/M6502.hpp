@@ -124,7 +124,7 @@ namespace jigo {
       SED, SEI, STA, STX, STY,
       TAX, TAY, TSX, TXA, TXS,
       TYA,
-      // Unodcumented instructions.
+      // Undocumented instructions.
       AHX, ALR, ANC, ARR, AXS,
       DCP, ISC, KIL, LAS, LAX,
       RLA, RRA, SAX, SHX, SHY,
@@ -168,7 +168,7 @@ namespace jigo {
       YIndexing
     } ;
 
-    /// An instruction's details.
+    /// Descriptor for a CPU instruction.
     struct InstructionTraits
     {
       std::uint8_t opcode ;
@@ -204,7 +204,7 @@ namespace jigo {
     void setVerbose(bool x) ;
 
   private:
-    // Transient state.
+    // Transient.
     InstructionTraits dc ; // Can be deduced from IR.
     bool verbose ;
 
