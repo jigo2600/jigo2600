@@ -186,11 +186,11 @@ std::ostream& operator<<(std::ostream& os, TIAState::Register r) {
 
 #define cmp(x) (x == s.x)
 bool TIAState::operator==(const jigo::TIAState& s) const {
-  return cmp(numCycles) && cmp(numFrames) && cmp(strobe) && cmp(D) &&
-         cmp(RDY) && cmp(beamX) && cmp(beamY) && cmp(Hphasec) && cmp(HBnot) &&
-         cmp(SEC) && cmp(SECL) && cmp(VB) && cmp(VS) && cmp(HMC) && cmp(BEC) &&
-         cmp(MEC) && cmp(PEC) && cmp(PF) && cmp(B) && cmp(M) && cmp(P) &&
-         cmp(collisions) && cmp(ports);
+  return cmp(numCycles) && cmp(numFrames) && cmp(strobe) && cmp(D) && cmp(RDY) &&
+         cmp(beamX) && cmp(beamY) && cmp(Hphasec) && cmp(HBnot) && cmp(SEC) &&
+         cmp(SECL) && cmp(VB) && cmp(VS) && cmp(HMC) && cmp(BEC) && cmp(MEC) &&
+         cmp(PEC) && cmp(PF) && cmp(B) && cmp(M) && cmp(P) && cmp(collisions) &&
+         cmp(ports);
 }
 #undef cmp
 
@@ -364,8 +364,7 @@ void TIA::cycle(bool CS, bool Rw, uint16_t address, uint8_t& data) {
       // The beam emits a color ony if HBLANK is off.
       if (HBnot.get()) {
         if (0 <= x && x < screenWidth && 0 <= y && y < screenHeight) {
-          screen[currentScreen][screenWidth * y + x] =
-              colors[collisionAndColor & 0xf];
+          screen[currentScreen][screenWidth * y + x] = colors[collisionAndColor & 0xf];
         }
       }
     }
@@ -565,8 +564,7 @@ void jigo::to_json(nlohmann::json& j, const TIAState::VideoStandard& p) {
 /// Throws `nlohmann::json::exception` on parsing errors.
 void jigo::from_json(const nlohmann::json& j, TIAState::VideoStandard& p) {
   if (j.is_null()) {
-    throw std::invalid_argument(
-        std::string("Video standard standard specifier is null"));
+    throw std::invalid_argument(std::string("Video standard standard specifier is null"));
   } else {
     string str = j.get<string>();
     if (str == "NTSC") {

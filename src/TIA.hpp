@@ -33,11 +33,7 @@ constexpr auto TIA_PAL_COLOR_CLOCK_RATE = 3.546894e6;
 // -----------------------------------------------------------------
 
 struct TIAState {
-  enum class VideoStandard : int {
-    NTSC,
-    PAL,
-    SECAM
-  } videoStandard = VideoStandard::NTSC;
+  enum class VideoStandard : int { NTSC, PAL, SECAM } videoStandard = VideoStandard::NTSC;
 
   enum Register {
     // Writable registers.

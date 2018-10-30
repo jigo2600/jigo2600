@@ -13,18 +13,20 @@
 
 namespace jigo {
 
-  enum M6502ByteType {
-    End = 0,
-    Data = 1,
-    Instruction0 = 2,
-    Instruction1,
-    Instruction2,
-  } ;
+enum M6502ByteType {
+  End = 0,
+  Data = 1,
+  Instruction0 = 2,
+  Instruction1,
+  Instruction2,
+};
 
-  using M6502Disassembly = std::vector<std::pair<std::uint16_t, M6502::Instruction>> ;
-  
-  M6502Disassembly disassembleM6502memory(std::uint8_t const * begin, std::uint8_t const * end) ;
-  std::vector<M6502ByteType> tagM6502Memory(std::uint8_t const * begin, std::uint8_t const * end) ;
-}
+using M6502Disassembly = std::vector<std::pair<std::uint16_t, M6502::Instruction>>;
+
+M6502Disassembly disassembleM6502memory(std::uint8_t const* begin,
+                                        std::uint8_t const* end);
+std::vector<M6502ByteType> tagM6502Memory(std::uint8_t const* begin,
+                                          std::uint8_t const* end);
+} // namespace jigo
 
 #endif /* M6502Disassembler_hpp */

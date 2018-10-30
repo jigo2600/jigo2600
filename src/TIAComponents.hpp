@@ -60,9 +60,7 @@ public:
   TIADualPhase() = default;
   TIADualPhase(int phase, bool RESL) : phase{phase}, RESL{RESL} {}
 
-  bool operator==(TIADualPhase const& rhs) const {
-    return cmp(phase) && cmp(RESL);
-  }
+  bool operator==(TIADualPhase const& rhs) const { return cmp(phase) && cmp(RESL); }
 
   friend void to_json(nlohmann::json& j, TIADualPhase const& x) {
     j = nlohmann::json::array({x.phase, x.RESL});
@@ -98,13 +96,9 @@ public:
 
   bool operator==(TIADelay const& rhs) const { return cmp(value); }
 
-  friend void to_json(nlohmann::json& j, TIADelay<T> const& x) {
-    j = x.value;
-  }
+  friend void to_json(nlohmann::json& j, TIADelay<T> const& x) { j = x.value; }
 
-  friend void from_json(nlohmann::json const& j, TIADelay<T>& x) {
-    x.value = j;
-  }
+  friend void from_json(nlohmann::json const& j, TIADelay<T>& x) { x.value = j; }
 
 protected:
   std::array<T, 2> value{};
@@ -148,8 +142,7 @@ public:
     return TIADualPhase::operator==(rhs) && cmp(C) && cmp(RES);
   }
 
-  friend void to_json(nlohmann::json& j,
-                      TIADualPhaseAndCounterFast<maxCount> const& x) {
+  friend void to_json(nlohmann::json& j, TIADualPhaseAndCounterFast<maxCount> const& x) {
     j = nlohmann::json::array({x.phase, x.RESL, x.C, x.RES});
   }
 
@@ -200,8 +193,7 @@ protected:
 };
 
 template <int maxCount>
-class TIADualPhaseAndCounterExplicit : public TIADualPhase,
-                                       public TIACounter<maxCount> {
+class TIADualPhaseAndCounterExplicit : public TIADualPhase, public TIACounter<maxCount> {
 public:
   void cycle(bool CLK, bool reset) {
     TIADualPhase::cycle(CLK, reset);
@@ -213,8 +205,7 @@ public:
    : TIADualPhase{phase, RESL}, TIACounter<maxCount>{C, RES} {}
 
   bool operator==(TIADualPhaseAndCounterExplicit const& rhs) const {
-    return TIADualPhase::operator==(rhs) &&
-           TIACounter<maxCount>::operator==(rhs);
+    return TIADualPhase::operator==(rhs) && TIACounter<maxCount>::operator==(rhs);
   }
 
   friend void to_json(nlohmann::json& j,
@@ -289,23 +280,15 @@ public:
   }
 
   void setHM(std::uint8_t data) { HM = 8 + (static_cast<int8_t>(data) >> 4); }
-
   void clearHM() { HM = 8; }
-
-  bool get(TIADualPhase const& phase) const {
-    return getENA() & phase.getPhi1();
-  }
-
+  bool get(TIADualPhase const& phase) const { return getENA() & phase.getPhi1(); }
   bool getENA() const { return ENA[1]; }
 
-  bool operator==(TIAExtraClock const& rhs) const {
-    return cmp(ENA) && cmp(HM);
-  }
+  bool operator==(TIAExtraClock const& rhs) const { return cmp(ENA) && cmp(HM); }
 
   friend void to_json(nlohmann::json& j, TIAExtraClock const& x) {
     j = nlohmann::json::array({x.ENA, x.HM});
   }
-
   friend void from_json(nlohmann::json const& j, TIAExtraClock& x) {
     x.ENA = j[0].get<decltype(ENA)>();
     x.HM = j[1].get<decltype(HM)>();
@@ -357,8 +340,8 @@ public:
   }
 
   bool operator==(TIAPlayField const& rhs) const {
-    return cmp(PF) && cmp(PFreg) && cmp(mask) && cmp(maskr) && cmp(REF) &&
-           cmp(SCORE) && cmp(PFP);
+    return cmp(PF) && cmp(PFreg) && cmp(mask) && cmp(maskr) && cmp(REF) && cmp(SCORE) &&
+           cmp(PFP);
   }
 
   friend void to_json(nlohmann::json& j, TIAPlayField const& x) {
@@ -466,8 +449,8 @@ public:
   }
 
   bool operator==(TIAPlayerFast const& rhs) const {
-    return cmp(PC) && cmp(START) && cmp(SC) && cmp(GRP) && cmp(NUSIZ) &&
-           cmp(VDELP) && cmp(ENA) && cmp(REFL);
+    return cmp(PC) && cmp(START) && cmp(SC) && cmp(GRP) && cmp(NUSIZ) && cmp(VDELP) &&
+           cmp(ENA) && cmp(REFL);
   }
 
   friend void to_json(nlohmann::json& j, TIAPlayerFast const& x) {
@@ -505,8 +488,7 @@ protected:
           start[NUSIZ][C] =
               ((C == 39)) ? 1
                           : 2 * (((C == 3) && (NUSIZ == 1 || NUSIZ == 3)) ||
-                                 ((C == 7) &&
-                                  (NUSIZ == 2 || NUSIZ == 3 || NUSIZ == 6)) ||
+                                 ((C == 7) && (NUSIZ == 2 || NUSIZ == 3 || NUSIZ == 6)) ||
                                  ((C == 15) && (NUSIZ == 4 || NUSIZ == 6)));
         }
       }
@@ -552,14 +534,12 @@ public:
     // Update the dual-phase driven logic.
     phasec.cycle(CLK, PLRE);
     // The START signal distingushes 1st and other copies for RESMP.
-    START.cycle(
-        phasec,
-        ((phasec.get() == 39))
-            ? 1
-            : 2 * (((phasec.get() == 3) && (NUSIZ == 1 || NUSIZ == 3)) ||
-                   ((phasec.get() == 7) &&
-                    (NUSIZ == 2 || NUSIZ == 3 || NUSIZ == 6)) ||
-                   ((phasec.get() == 15) && (NUSIZ == 4 || NUSIZ == 6))));
+    START.cycle(phasec, ((phasec.get() == 39))
+                            ? 1
+                            : 2 * (((phasec.get() == 3) && (NUSIZ == 1 || NUSIZ == 3)) ||
+                                   ((phasec.get() == 7) &&
+                                    (NUSIZ == 2 || NUSIZ == 3 || NUSIZ == 6)) ||
+                                   ((phasec.get() == 15) && (NUSIZ == 4 || NUSIZ == 6))));
   }
 
   bool get() const {
@@ -585,8 +565,8 @@ public:
   void shiftGRP() { GRP[1] = GRP[0]; }
 
   bool operator==(TIAPlayerExplicit const& rhs) const {
-    return cmp(phasec) && cmp(START) && cmp(SC) && cmp(GRP) && cmp(NUSIZ) &&
-           cmp(VDELP) && cmp(ENA) && cmp(REFL);
+    return cmp(phasec) && cmp(START) && cmp(SC) && cmp(GRP) && cmp(NUSIZ) && cmp(VDELP) &&
+           cmp(ENA) && cmp(REFL);
   }
 
   friend void to_json(nlohmann::json& j, TIAPlayerExplicit const& x) {
@@ -665,8 +645,7 @@ public:
   }
 
   bool operator==(TIAMissileFast const& rhs) const {
-    return cmp(MC) && cmp(START) && cmp(SIZ) && cmp(ENAM) && cmp(RESMP) &&
-           cmp(counter);
+    return cmp(MC) && cmp(START) && cmp(SIZ) && cmp(ENAM) && cmp(RESMP) && cmp(counter);
   }
 
   friend void to_json(nlohmann::json& j, TIAMissileFast const& x) {
@@ -694,10 +673,9 @@ protected:
     Tables() {
       for (int NUSIZ = 0; NUSIZ < 8; ++NUSIZ) {
         for (int C = 0; C < 40; ++C) {
-          start[NUSIZ][C] =
-              ((C == 39)) || ((C == 3) && (NUSIZ == 1 || NUSIZ == 3)) ||
-              ((C == 7) && (NUSIZ == 2 || NUSIZ == 3 || NUSIZ == 6)) ||
-              ((C == 15) && (NUSIZ == 4 || NUSIZ == 6));
+          start[NUSIZ][C] = ((C == 39)) || ((C == 3) && (NUSIZ == 1 || NUSIZ == 3)) ||
+                            ((C == 7) && (NUSIZ == 2 || NUSIZ == 3 || NUSIZ == 6)) ||
+                            ((C == 15) && (NUSIZ == 4 || NUSIZ == 6));
         }
       }
     }
@@ -719,19 +697,17 @@ public:
     // Update the dual-phase logic.
     MC.cycle(CLK, MRE || (RESMP && PL.getRESMP()));
     int NUSIZ = PL.getNUSIZ();
-    START1.cycle(
-        MC, ((MC.get() == 39)) ||
-                ((MC.get() == 3) && (NUSIZ == 1 || NUSIZ == 3)) ||
-                ((MC.get() == 7) && (NUSIZ == 2 || NUSIZ == 3 || NUSIZ == 6)) ||
-                ((MC.get() == 15) && (NUSIZ == 4 || NUSIZ == 6)));
+    START1.cycle(MC, ((MC.get() == 39)) ||
+                         ((MC.get() == 3) && (NUSIZ == 1 || NUSIZ == 3)) ||
+                         ((MC.get() == 7) && (NUSIZ == 2 || NUSIZ == 3 || NUSIZ == 6)) ||
+                         ((MC.get() == 15) && (NUSIZ == 4 || NUSIZ == 6)));
     START2.cycle(MC, START1.get());
   }
 
   bool get() const {
     if (ENAM && !RESMP) {
       if (START1.get()) {
-        return (SIZ >= 2) || ((SIZ >= 1) & (MC.getPhase() >= 2)) ||
-               (MC.getPhase() == 2);
+        return (SIZ >= 2) || ((SIZ >= 1) & (MC.getPhase() >= 2)) || (MC.getPhase() == 2);
       } else if (START2.get()) {
         return (SIZ == 3);
       }
@@ -744,8 +720,7 @@ public:
   void setSIZ(uint8_t D) { SIZ = (D >> 4) & 0x3; }
 
   bool operator==(TIAMissileExplicit const& rhs) const {
-    return cmp(MC) && cmp(SIZ) && cmp(ENAM) && cmp(RESMP) && cmp(START1) &&
-           cmp(START2);
+    return cmp(MC) && cmp(SIZ) && cmp(ENAM) && cmp(RESMP) && cmp(START1) && cmp(START2);
   }
 
   friend void to_json(nlohmann::json& j, TIAMissileExplicit const& x) {

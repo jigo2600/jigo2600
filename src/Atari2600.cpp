@@ -19,20 +19,18 @@ using namespace std;
 using namespace jigo;
 using json = nlohmann::json;
 
-std::ostream& operator<<(std::ostream& os,
-                         Atari2600::DecodedAddress const& da) {
+std::ostream& operator<<(std::ostream& os, Atari2600::DecodedAddress const& da) {
   if (da.device == Atari2600::DecodedAddress::TIA) {
     os << da.tiaRegister;
   } else if (da.device == Atari2600::DecodedAddress::PIA) {
     if (da.piaRegister == M6532State::Register::RAM) {
-      os << "$" << hex << setfill('0') << uppercase << setw(2)
-         << (int)da.address << "_RAM";
+      os << "$" << hex << setfill('0') << uppercase << setw(2) << (int)da.address
+         << "_RAM";
     } else {
       os << da.piaRegister;
     }
   } else {
-    os << "$" << hex << setfill('0') << uppercase << setw(4) << (int)da.address
-       << "_ROM";
+    os << "$" << hex << setfill('0') << uppercase << setw(4) << (int)da.address << "_ROM";
   }
   return os;
 }
@@ -87,10 +85,10 @@ Atari2600::DecodedAddress::DecodedAddress(uint32_t address, bool Rw) {
 // -------------------------------------------------------------------
 
 /// Create a new state using the specified component states.
-Atari2600State::Atari2600State(
-    std::shared_ptr<M6502State> cpu, std::shared_ptr<M6532State> pia,
-    std::shared_ptr<TIAState> tia,
-    std::shared_ptr<Atari2600CartridgeState> cartridge)
+Atari2600State::Atari2600State(std::shared_ptr<M6502State> cpu,
+                               std::shared_ptr<M6532State> pia,
+                               std::shared_ptr<TIAState> tia,
+                               std::shared_ptr<Atari2600CartridgeState> cartridge)
  : cpu(cpu), pia(pia), tia(tia), cartridge(cartridge) {
 }
 
@@ -147,9 +145,9 @@ Atari2600::StoppingReason Atari2600::cycle(size_t& maxNumCPUCycles) {
     auto da = DecodedAddress(_cpu->getAddressBus(), _cpu->getRW());
 
     // Step the PIA.
-    bool oututPortsChanged = _pia->cycle(
-        da.device == DecodedAddress::PIA, _cpu->getAddressBus() & 0x200,
-        _cpu->getRW(), _cpu->getAddressBus(), _cpu->getDataBus());
+    bool oututPortsChanged =
+        _pia->cycle(da.device == DecodedAddress::PIA, _cpu->getAddressBus() & 0x200,
+                    _cpu->getRW(), _cpu->getAddressBus(), _cpu->getDataBus());
 
     if (oututPortsChanged) {
       syncPorts();
@@ -158,8 +156,8 @@ Atari2600::StoppingReason Atari2600::cycle(size_t& maxNumCPUCycles) {
     // Step the TIA. Remember the current frame in order to detect
     // the beginning of a new one.
     auto lastFrame = _tia->numFrames;
-    _tia->cycle(da.device == DecodedAddress::TIA, _cpu->getRW(),
-                _cpu->getAddressBus(), _cpu->getDataBus());
+    _tia->cycle(da.device == DecodedAddress::TIA, _cpu->getRW(), _cpu->getAddressBus(),
+                _cpu->getDataBus());
 
     // Step the cartridge. The cartridge must be updated last
     // as some rare cart types (FE banking) "sniff"
@@ -170,10 +168,9 @@ Atari2600::StoppingReason Atari2600::cycle(size_t& maxNumCPUCycles) {
 
     if (_tia->getVerbose() & false) {
       cout << (da.Rw ? "R" : "W") << setfill('0') << setw(4) << hex
-           << (int)_cpu->getAddressBus() << " (" << setfill(' ') << setw(8)
-           << da << ") = " << setfill('0') << setw(2) << hex
-           << (int)_cpu->getDataBus() << " " << M6502::decode(_cpu->getIR())
-           << " T" << _cpu->getT() << std::endl;
+           << (int)_cpu->getAddressBus() << " (" << setfill(' ') << setw(8) << da
+           << ") = " << setfill('0') << setw(2) << hex << (int)_cpu->getDataBus() << " "
+           << M6502::decode(_cpu->getIR()) << " T" << _cpu->getT() << std::endl;
     }
 
     // Check if the maximum number of CPU clocks have been simulated.
@@ -335,8 +332,7 @@ void Atari2600::setJoystick(int num, Joystick joystick) {
   inputType = InputType::joystick;
 }
 
-template <typename T, size_t n>
-ostream& operator<<(ostream& os, array<T, n> const& x) {
+template <typename T, size_t n> ostream& operator<<(ostream& os, array<T, n> const& x) {
   for (auto i : x)
     os << i << " ";
   return os;
@@ -365,8 +361,7 @@ void Atari2600::syncPorts() {
              (1 << 1) * !joysticks[num][Joystick::down] +
              (1 << 0) * !joysticks[num][Joystick::up];
     };
-    tia.ports.setI45(
-        {!joysticks[0][Joystick::fire], !joysticks[1][Joystick::fire]});
+    tia.ports.setI45({!joysticks[0][Joystick::fire], !joysticks[1][Joystick::fire]});
     pia.writePortA((setj(0) << 4) | setj(1));
     break;
   }
@@ -419,8 +414,7 @@ void Atari2600::syncPorts() {
   }
   default: assert(false); break;
   }
-  pia.writePortB((1 << 0) * !panel[Panel::reset] +
-                 (1 << 1) * !panel[Panel::select] +
+  pia.writePortB((1 << 0) * !panel[Panel::reset] + (1 << 1) * !panel[Panel::select] +
                  (1 << 3) * !panel[Panel::colorMode] +
                  (1 << 6) * !panel[Panel::difficultyLeft] +
                  (1 << 7) * !panel[Panel::difficultyRight]);
@@ -431,8 +425,8 @@ void Atari2600::syncPorts() {
 // -------------------------------------------------------------------
 
 Atari2600::Atari2600()
- : Atari2600State(make_shared<M6502>(), make_shared<M6532>(),
-                  make_shared<jigo::TIA>(), nullptr) {
+ : Atari2600State(make_shared<M6502>(), make_shared<M6532>(), make_shared<jigo::TIA>(),
+                  nullptr) {
   setVideoStandard(VideoStandard::NTSC);
   panel.Panel::super::reset();
   panel.set(Panel::colorMode);
@@ -483,8 +477,7 @@ uint32_t Atari2600::virtualizeAddress(uint16_t address) const {
 uint8_t const* Atari2600::dataForVirtualAddress(std::uint32_t address) const {
   uint8_t const* data = NULL;
   auto da = DecodedAddress(address, false);
-  if (da.device == DecodedAddress::PIA &&
-      da.piaRegister == M6532State::Register::RAM) {
+  if (da.device == DecodedAddress::PIA && da.piaRegister == M6532State::Register::RAM) {
     data = &pia->ram[0] + (address & 0x7f);
   } else if (da.device == DecodedAddress::Cartridge) {
     auto cart = getCartridge();
@@ -550,8 +543,7 @@ std::ostream& Atari2600::printInstruction(std::ostream& os,
   switch (ins.addressingMode) {
   case M6502::absolute:
   case M6502::zeroPage: {
-    auto da =
-        Atari2600::DecodedAddress(ins.operand, ins.accessType == M6502::read);
+    auto da = Atari2600::DecodedAddress(ins.operand, ins.accessType == M6502::read);
     return os << ins.mnemonic << " " << da;
   }
   default: return os << ins;

@@ -4,7 +4,7 @@ PointerAlignment: Left
 ConstructorInitializerIndentWidth: 1
 AllowShortIfStatementsOnASingleLine: false
 IndentCaseLabels: false
-ColumnLimit: 120
+ColumnLimit: 90
 AlignEscapedNewlines: true
 AllowShortCaseLabelsOnASingleLine: true
 AllowShortFunctionsOnASingleLine: InlineOnly

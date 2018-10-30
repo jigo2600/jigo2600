@@ -212,6 +212,12 @@ PYBIND11_MODULE(core, m) {
   // MARK: M6532
   // ----------------------------------------------------------------
 
+  struct Memory {
+    std::uint8_t *begin ;
+    std::uint8_t *end ;
+  } ;
+
+//  py::class_<Memory> 
   py::class_<M6532State, shared_ptr<M6532State>> m6532state(m, "M6532State");
   m6532state.def(py::init<>())
       .def_property_readonly("ram", [](M6532State& self) {
